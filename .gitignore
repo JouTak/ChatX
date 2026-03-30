@@ -1,4 +1,8 @@
 target/
 .idea/
 unichat.iml
+ChatX.iml
 /src/test/
+build/
+.gradle/
+gradle/libs.versions.toml
