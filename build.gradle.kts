@@ -28,14 +28,14 @@ repositories {
 
 dependencies {
     implementation("com.github.retrooper:packetevents-velocity:2.12.1")
-    implementation("redis.clients:jedis:6.2.0")
-    implementation("com.zaxxer:HikariCP:5.1.0")
-    implementation("org.xerial:sqlite-jdbc:3.50.3.0")
-    implementation("mysql:mysql-connector-java:8.0.18")
+    implementation("redis.clients:jedis:7.1.0")
+    implementation("com.zaxxer:HikariCP:7.0.2")
+    implementation("org.xerial:sqlite-jdbc:3.53.1.0")
+    implementation("com.mysql:mysql-connector-j:9.7.0")
     compileOnly("com.velocitypowered:velocity-api:3.5.0-SNAPSHOT")
     compileOnly("net.skinsrestorer:skinsrestorer-api:15.12.0")
     compileOnly("io.github.miniplaceholders:miniplaceholders-api:3.2.0")
-    compileOnly("net.william278:papiproxybridge:1.6")
+    compileOnly("net.william278:papiproxybridge:1.8.4")
     compileOnly("it.unimi.dsi:fastutil:8.5.18")
     compileOnly(files("lib/floodgate-velocity.jar"))
     annotationProcessor("com.velocitypowered:velocity-api:3.5.0-SNAPSHOT")
@@ -55,6 +55,7 @@ tasks {
         relocate("com.zaxxer.hikari", "cn.jason31416.chatx.lib.hikari")
         archiveBaseName.set(baseName)
         archiveClassifier.set("")
+        minimize()
     }
 
     jar {
