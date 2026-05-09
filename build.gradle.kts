@@ -27,30 +27,31 @@ repositories {
 }
 
 dependencies {
-//    implementation("com.github.retrooper:packetevents-velocity:2.11.2")
-    implementation(files("lib/packetevents-velocity-2.12.0-SNAPSHOT.jar"))
+    implementation("com.github.retrooper:packetevents-velocity:2.12.1")
     implementation("redis.clients:jedis:6.2.0")
     implementation("com.zaxxer:HikariCP:5.1.0")
     implementation("org.xerial:sqlite-jdbc:3.50.3.0")
     implementation("mysql:mysql-connector-java:8.0.18")
-    compileOnly("com.velocitypowered:velocity-api:3.4.0-SNAPSHOT")
-    compileOnly("net.skinsrestorer:skinsrestorer-api:15.7.9")
-    compileOnly("io.github.miniplaceholders:miniplaceholders-api:3.0.1")
+    compileOnly("com.velocitypowered:velocity-api:3.5.0-SNAPSHOT")
+    compileOnly("net.skinsrestorer:skinsrestorer-api:15.12.0")
+    compileOnly("io.github.miniplaceholders:miniplaceholders-api:3.2.0")
     compileOnly("net.william278:papiproxybridge:1.6")
     compileOnly("it.unimi.dsi:fastutil:8.5.18")
     compileOnly(files("lib/floodgate-velocity.jar"))
+    annotationProcessor("com.velocitypowered:velocity-api:3.5.0-SNAPSHOT")
 }
 
 group = "cn.jason31416"
 version = "1.2.2"
 description = "ChatX"
-java.sourceCompatibility = JavaVersion.VERSION_17
+java.sourceCompatibility = JavaVersion.VERSION_25
 var baseName: String = "ChatX-Beta"
 
 tasks {
     shadowJar {
         relocate("redis.clients", "cn.jason31416.chatx.lib.redis")
         relocate("com.github.retrooper.packetevents", "cn.jason31416.chatx.lib.packetevents")
+        relocate("io.github.retrooper.packetevents", "cn.jason31416.chatx.lib.packetevents")
         relocate("com.zaxxer.hikari", "cn.jason31416.chatx.lib.hikari")
         archiveBaseName.set(baseName)
         archiveClassifier.set("")
