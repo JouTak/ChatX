@@ -55,7 +55,9 @@ tasks {
         relocate("com.zaxxer.hikari", "cn.jason31416.chatx.lib.hikari")
         archiveBaseName.set(baseName)
         archiveClassifier.set("")
-        minimize()
+        minimize {
+            exclude(dependency("org.xerial:sqlite-jdbc"))
+        }
     }
 
     jar {
