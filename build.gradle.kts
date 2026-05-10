@@ -44,7 +44,7 @@ dependencies {
 group = "cn.jason31416"
 version = "1.2.2"
 description = "ChatX"
-java.sourceCompatibility = JavaVersion.VERSION_25
+java.sourceCompatibility = JavaVersion.VERSION_21
 var baseName: String = "ChatX-Beta"
 
 tasks {
