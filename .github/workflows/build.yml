@@ -19,14 +19,14 @@ jobs:
       with:
         java-version: '21'
         distribution: 'zulu'
-        cache: maven
+        cache: gradle
     - name: Build with Gradle
       run: ./gradlew build
     - name: Upload ChatX
       uses: actions/upload-artifact@v7
       with:
         name: ChatX
-        path: "*/target/ChatX-*.jar"
+        path: "build/libs/ChatX-*.jar"
     - uses: dev-drprasad/delete-tag-and-release@v0.2.1
       if: ${{ github.event_name == 'push' }}
       with:
