@@ -71,6 +71,10 @@ public class Config {
         return configTree.contains(key);
     }
 
+    public static String getServerDisplayName(String serverName) {
+        return configTree.getString("servers." + serverName, serverName);
+    }
+
     @SuppressWarnings("ResultOfMethodCallIgnored")
     public static void reload() {
         if(!ChatX.getDataDirectory().exists()) ChatX.getDataDirectory().mkdirs();

@@ -44,3 +44,7 @@ module:
     sound-effect-pitch: 1 # 0.5-2
 
 debug: false # Do not turn on unless instructed
+
+servers:
+  mod: "ITMOcraft Modex"
+  # mod -> ITMOcraft Modex

@@ -3,6 +3,7 @@ package cn.jason31416.chatx.channel.type.serverwide;
 import cn.jason31416.chatx.channel.Channel;
 import cn.jason31416.chatx.channel.type.ServerWideChannelHandler;
 import cn.jason31416.chatx.message.Message;
+import cn.jason31416.chatx.util.Config;
 import cn.jason31416.chatx.util.SimplePlayer;
 import net.kyori.adventure.text.Component;
 
@@ -27,7 +28,8 @@ public class LocalChannelHandler extends ServerWideChannelHandler {
         return new Message(text)
                 .add("player", sender.getName())
                 .add("channel", channel.getConfig(sender.getCurrentServer()).getDisplayName())
-                .toComponent();
+                .add("server", Config.getServerDisplayName(sender.getCurrentServer()))
+                .toComponent(sender.getPlayer());
     }
 
     @Override

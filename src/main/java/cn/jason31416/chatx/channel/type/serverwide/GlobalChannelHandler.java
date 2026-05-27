@@ -4,6 +4,7 @@ import cn.jason31416.chatx.ChatX;
 import cn.jason31416.chatx.channel.Channel;
 import cn.jason31416.chatx.channel.type.ServerWideChannelHandler;
 import cn.jason31416.chatx.message.Message;
+import cn.jason31416.chatx.util.Config;
 import cn.jason31416.chatx.util.SimplePlayer;
 import lombok.SneakyThrows;
 import net.kyori.adventure.text.Component;
@@ -29,7 +30,8 @@ public class GlobalChannelHandler extends ServerWideChannelHandler {
         Message msg = new Message(text);
         msg.add("player", sender.getName());
         msg.add("channel", channel.getConfig(sender.getCurrentServer()).getDisplayName());
-        return msg.toComponent();
+        msg.add("server", Config.getServerDisplayName(sender.getCurrentServer()));
+        return msg.toComponent(sender.getPlayer());
     }
 
     @Override

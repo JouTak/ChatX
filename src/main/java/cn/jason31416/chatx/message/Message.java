@@ -1,7 +1,10 @@
 package cn.jason31416.chatx.message;
 
+import io.github.miniplaceholders.api.MiniPlaceholders;
+import net.kyori.adventure.audience.Audience;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
+import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 
 public class Message {
@@ -49,6 +52,15 @@ public class Message {
 
     public Component toComponent() {
         return MiniMessage.miniMessage().deserialize(content);
+    }
+
+    public Component toComponent(Audience audience) {
+        try {
+            TagResolver resolver = MiniPlaceholders.audienceGlobalPlaceholders();
+            return MiniMessage.miniMessage().deserialize(content, audience, resolver);
+        } catch (NoClassDefFoundError e) {
+            return toComponent();
+        }
     }
 
     public String toFormatted() {
