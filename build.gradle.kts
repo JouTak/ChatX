@@ -27,7 +27,7 @@ repositories {
 }
 
 dependencies {
-    implementation("com.github.retrooper:packetevents-velocity:2.12.1")
+    implementation("com.github.retrooper:packetevents-velocity:2.13.0")
     implementation("redis.clients:jedis:7.1.0")
     implementation("com.zaxxer:HikariCP:7.0.2")
     implementation("org.xerial:sqlite-jdbc:3.53.1.0")
