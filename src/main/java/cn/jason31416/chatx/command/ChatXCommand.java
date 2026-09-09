@@ -1,6 +1,7 @@
 package cn.jason31416.chatx.command;
 
 import cn.jason31416.chatx.handler.PunishmentHandler;
+import cn.jason31416.chatx.util.Config;
 import cn.jason31416.chatx.util.SimplePlayer;
 import cn.jason31416.chatx.util.TimeUtil;
 import com.velocitypowered.api.command.SimpleCommand;
@@ -18,8 +19,17 @@ public class ChatXCommand implements SimpleCommand {
     @Override
     public void execute(Invocation invocation) {
         if(invocation.arguments().length == 0 || invocation.arguments()[0].equals("version")){
-            invocation.source().sendMessage(new Message("<#47BFFB>ChatX v"+ ChatX.getProxy().getPluginManager().getPlugin("chatx").get().getDescription().getVersion().get()
-                + " by onelili & Jason31416").toComponent());
+            String version = ChatX.getProxy().getPluginManager().getPlugin("chatx")
+                    .flatMap(container -> container.getDescription().getVersion())
+                    .orElse("unknown");
+            String name = Config.getConfigTree().getString("branding.name", "ChatXJT");
+            List<String> authors = Config.getConfigTree().getStringList("branding.authors");
+            if (authors.isEmpty()) {
+                authors = List.of("EnderDissa");
+            }
+            invocation.source().sendMessage(new Message(
+                    "<#47BFFB>" + name + " v" + version + " by " + String.join(", ", authors)
+            ).toComponent());
             return;
         }
         switch (invocation.arguments()[0]){

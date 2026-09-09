@@ -2,6 +2,12 @@
 # If you wish to use redis, YOU MUST CHANGE THIS TO SOMETHING ELSE
 server-name: "Velocity"
 
+# Branding shown by /chatx. The version is read automatically from the installed plugin.
+branding:
+  name: "ChatXJT"
+  authors:
+    - "EnderDissa"
+
 lang: "en-US"
 
 database:

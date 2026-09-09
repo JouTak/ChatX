@@ -40,11 +40,8 @@ import java.util.concurrent.TimeUnit;
 @Plugin(
         id = "chatx",
         name = "ChatXJT",
-        version = "2.0.0",
+        version = "1.3.1",
         authors = {
-                "oneLiLi",
-                "jason31416",
-                "Neokoni",
                 "EnderDissa"
         },
         dependencies = {
