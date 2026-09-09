@@ -127,14 +127,19 @@ public class ChatPacketListener extends SimplePacketListenerAbstract {
                 if(isSigned)
                     attemptRewriteSignedPacket(event);
                 return;
-            }else if(channel.getConfig(player).getHandleMode() == Channel.HandleMode.IGNORE_BACKEND || channel.getConfig(player).getHandleMode() == Channel.HandleMode.NOTIFY_BACKEND){
+            }else if(channel.getConfig(player).getHandleMode() == Channel.HandleMode.IGNORE_BACKEND){
                 event.setCancelled(true);
                 return;
-            }else if(channel.getConfig(player).getHandleMode() == Channel.HandleMode.RESPECT_BACKEND){
+            }else if(channel.getConfig(player).getHandleMode() == Channel.HandleMode.RESPECT_BACKEND
+                    || channel.getConfig(player).getHandleMode() == Channel.HandleMode.NOTIFY_BACKEND){
                 event.setCancelled(true);
 
                 ChatX.getProxy().getScheduler().buildTask(ChatX.getInstance(), ()->{
-                    Channel.handleChat(player, channel, PlainTextComponentSerializer.plainText().serialize(message));
+                    Channel.handleProcessedChat(
+                            player,
+                            channel,
+                            message
+                    );
                 }).schedule();
                 return;
             }

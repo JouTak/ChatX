@@ -4,6 +4,8 @@ import cn.jason31416.chatx.ChatX;
 import cn.jason31416.chatx.channel.Channel;
 import cn.jason31416.chatx.channel.ChannelHandler;
 import cn.jason31416.chatx.handler.ChatHistoryManager;
+import cn.jason31416.chatx.handler.InteractiveChatBridge;
+import cn.jason31416.chatx.handler.InteractiveChatHook;
 import cn.jason31416.chatx.message.Message;
 import cn.jason31416.chatx.module.PatternModule;
 import cn.jason31416.chatx.util.PlaceholderUtil;
@@ -11,6 +13,7 @@ import cn.jason31416.chatx.util.SimplePlayer;
 import net.kyori.adventure.chat.ChatType;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
 import javax.annotation.Nonnull;
 import java.util.List;
@@ -43,9 +46,47 @@ public abstract class ServerWideChannelHandler implements ChannelHandler {
                     for(SimplePlayer receiver : receivers) {
                         if(getChannel().getConfig(player.getCurrentServer()).getReceivePermission() != null&&!receiver.hasPermission(Objects.requireNonNull(getChannel().getConfig(player.getCurrentServer()).getReceivePermission())))
                             continue;
-                        receiver.getPlayer().sendMessage(component, ChatType.CHAT.bind(component));
+                        if (InteractiveChatHook.containsPlaceholder(message)) {
+                            ChatX.getInteractiveChatBridge().process(player.getPlayer(), receiver.getPlayer(), component, processed -> {
+                                Component marked = InteractiveChatBridge.markProcessed(processed);
+                                receiver.getPlayer().sendMessage(marked, ChatType.CHAT.bind(marked));
+                            });
+                        } else {
+                            receiver.getPlayer().sendMessage(component, ChatType.CHAT.bind(component));
+                        }
                     }
                     if(getChannel().getConfig(player.getCurrentServer()).isLogToConsole()) ChatX.getProxy().getConsoleCommandSource().sendMessage(component);
                 });
+    }
+
+    @Override
+    public void handleProcessed(@Nonnull SimplePlayer player, @Nonnull Component component) {
+        PlaceholderUtil.replacePlaceholders(getChannel().getConfig(player.getCurrentServer()).getFormat(), player.getPlayer())
+                .thenAccept(text -> {
+            List<SimplePlayer> receivers = getReceivers(player);
+            Component message = getPrefix(text, player).append(component);
+            PatternModule.notifyMentions(
+                    player.getPlayer(),
+                    PlainTextComponentSerializer.plainText().serialize(component),
+                    receivers
+            );
+            for(SimplePlayer receiver : receivers) {
+                if(getChannel().getConfig(player.getCurrentServer()).getReceivePermission() != null
+                        && !receiver.hasPermission(Objects.requireNonNull(getChannel().getConfig(player.getCurrentServer()).getReceivePermission()))) {
+                    continue;
+                }
+                if (InteractiveChatHook.containsPlaceholder(PlainTextComponentSerializer.plainText().serialize(component))) {
+                    ChatX.getInteractiveChatBridge().process(player.getPlayer(), receiver.getPlayer(), message, processed -> {
+                        Component marked = InteractiveChatBridge.markProcessed(processed);
+                        receiver.getPlayer().sendMessage(marked, ChatType.CHAT.bind(marked));
+                    });
+                } else {
+                    receiver.getPlayer().sendMessage(message, ChatType.CHAT.bind(message));
+                }
+            }
+            if(getChannel().getConfig(player.getCurrentServer()).isLogToConsole()) {
+                ChatX.getProxy().getConsoleCommandSource().sendMessage(message);
+            }
+        });
     }
 }

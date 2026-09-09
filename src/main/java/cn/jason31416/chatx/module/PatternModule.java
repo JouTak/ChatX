@@ -72,4 +72,13 @@ public abstract class PatternModule {
         }
         return result.color(NamedTextColor.WHITE);
     }
+
+    public static void notifyMentions(@Nullable Player sender, @Nonnull String message, List<SimplePlayer> receivers) {
+        if (sender == null) return;
+        for (SimplePlayer receiver : receivers) {
+            if (message.contains("@" + receiver.getName())) {
+                MentionModule.mention(receiver, sender);
+            }
+        }
+    }
 }

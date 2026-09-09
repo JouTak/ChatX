@@ -18,6 +18,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import org.jetbrains.annotations.NotNull;
+import net.kyori.adventure.text.Component;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -189,5 +190,9 @@ public class Channel {
     }
     public static void handleChat(Player player, Channel channel, String message){
         channel.getHandler().handle(new SimplePlayer(player), message);
+    }
+
+    public static void handleProcessedChat(Player player, Channel channel, Component message){
+        channel.getHandler().handleProcessed(new SimplePlayer(player), message);
     }
 }

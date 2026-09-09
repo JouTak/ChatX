@@ -39,16 +39,18 @@ import java.util.concurrent.TimeUnit;
 
 @Plugin(
         id = "chatx",
-        name = "ChatX",
-        version = "1.2.2",
+        name = "ChatXJT",
+        version = "2.0.0",
         authors = {
                 "oneLiLi",
                 "jason31416",
-                "Neokoni"
+                "Neokoni",
+                "EnderDissa"
         },
         dependencies = {
                 @Dependency(id = "packetevents", optional = true),
-                @Dependency(id = "papiproxybridge", optional = true)
+                @Dependency(id = "papiproxybridge", optional = true),
+                @Dependency(id = "interactivechatvelocity", optional = true)
         }
 )
 public class ChatX {
@@ -60,6 +62,8 @@ public class ChatX {
     private static Logger logger;
     @Getter
     private static File dataDirectory;
+    @Getter
+    private static InteractiveChatBridge interactiveChatBridge;
 
     @Inject
     public ChatX(@Nonnull ProxyServer proxy, @Nonnull Logger logger, @Nonnull @DataDirectory Path dataDirectory) {
@@ -73,6 +77,8 @@ public class ChatX {
     @Subscribe
     public void onProxyInitialization(@Nonnull ProxyInitializeEvent event) {
         proxy.getEventManager().register(this, new EventListener());
+        interactiveChatBridge = new InteractiveChatBridge();
+        proxy.getEventManager().register(this, interactiveChatBridge);
         Config.init();
         MessageLoader.initialize();
 

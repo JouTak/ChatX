@@ -34,7 +34,9 @@ public class EventListener {
 
         Channel channel;
         String message;
-        if (Channel.channelPrefixes.containsKey(event.getMessage().substring(0, 1))) {
+        boolean prefixedChannel = !event.getMessage().isEmpty()
+                && Channel.channelPrefixes.containsKey(event.getMessage().substring(0, 1));
+        if (prefixedChannel) {
             channel = Channel.channelPrefixes.get(event.getMessage().substring(0, 1));
             message = event.getMessage().substring(1);
         } else {
@@ -64,6 +66,15 @@ public class EventListener {
             return;
         }
 
+        if (prefixedChannel) {
+            Channel selectedChannel = channel;
+            ChatX.getProxy().getScheduler().buildTask(ChatX.getInstance(), () ->
+                    Channel.handleChat(event.getPlayer(), selectedChannel, message)
+            ).schedule();
+            event.setResult(PlayerChatEvent.ChatResult.denied());
+            return;
+        }
+
         if(channel.getConfig(serverid).getHandleMode() == Channel.HandleMode.PASSTHROUGH){
             // Allow the packet to passthrough
             ChatX.getProxy().getScheduler().buildTask(ChatX.getInstance(), ()->{
@@ -71,10 +82,7 @@ public class EventListener {
             }).schedule();
             return;
         }else if(channel.getConfig(serverid).getHandleMode() == Channel.HandleMode.NOTIFY_BACKEND){
-            ChatX.getProxy().getScheduler().buildTask(ChatX.getInstance(), ()->{
-                Channel.handleChat(event.getPlayer(), channel, message);
-            }).schedule();
-            // Allow the packet to passthrough. Should be blocked in the ChatPacketListener in the future.
+            // Let the backend produce the final component. ChatPacketListener will redistribute it.
             return;
         }else if(channel.getConfig(serverid).getHandleMode() == Channel.HandleMode.RESPECT_BACKEND){
             // Allow the packet to passthrough

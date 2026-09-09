@@ -15,6 +15,10 @@ import javax.annotation.Nonnull;
 public interface ChannelHandler {
     void handle(@Nonnull SimplePlayer player, @Nonnull String message);
 
+    default void handleProcessed(@Nonnull SimplePlayer player, @Nonnull Component message) {
+        handle(player, PlainTextComponentSerializer.plainText().serialize(message));
+    }
+
     default void destroy() {}
 
     default SimpleCommand getCommand(Channel channel) {
