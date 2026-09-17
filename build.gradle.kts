@@ -28,6 +28,11 @@ repositories {
 
 dependencies {
     implementation("com.github.retrooper:packetevents-velocity:2.13.0")
+    implementation("net.dv8tion:JDA:6.6.0") {
+        exclude(module = "opus-java")
+        exclude(module = "tink")
+        exclude(group = "org.slf4j", module = "slf4j-api")
+    }
     implementation("redis.clients:jedis:7.1.0")
     implementation("com.zaxxer:HikariCP:7.0.2")
     implementation("org.xerial:sqlite-jdbc:3.53.1.0")
@@ -42,7 +47,7 @@ dependencies {
 }
 
 group = "cn.jason31416"
-version = "1.3.1"
+version = "1.3.2"
 description = "ChatXJT"
 java.sourceCompatibility = JavaVersion.VERSION_21
 var baseName: String = "ChatX-Beta"
@@ -53,6 +58,15 @@ tasks {
         relocate("com.github.retrooper.packetevents", "cn.jason31416.chatx.lib.packetevents")
         relocate("io.github.retrooper.packetevents", "cn.jason31416.chatx.lib.packetevents")
         relocate("com.zaxxer.hikari", "cn.jason31416.chatx.lib.hikari")
+        relocate("net.dv8tion.jda", "cn.jason31416.chatx.lib.jda")
+        relocate("com.neovisionaries.ws.client", "cn.jason31416.chatx.lib.nvwebsocket")
+        relocate("okhttp3", "cn.jason31416.chatx.lib.okhttp")
+        relocate("okio", "cn.jason31416.chatx.lib.okio")
+        relocate("kotlin", "cn.jason31416.chatx.lib.kotlin")
+        relocate("org.jetbrains.annotations", "cn.jason31416.chatx.lib.jetbrains.annotations")
+        relocate("gnu.trove", "cn.jason31416.chatx.lib.trove")
+        relocate("org.apache.commons.collections4", "cn.jason31416.chatx.lib.commons.collections4")
+        relocate("com.fasterxml.jackson", "cn.jason31416.chatx.lib.jackson")
         archiveBaseName.set(baseName)
         archiveClassifier.set("")
         minimize {
