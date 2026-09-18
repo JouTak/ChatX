@@ -20,7 +20,8 @@ import java.util.List;
 public class DiscordManager {
     private final JDA jda;
     private final DiscordConfig config;
-    private volatile List<DiscordConfig.Route> availableRoutes = List.of();
+    private volatile List<DiscordRoute> availableRoutes = List.of();
+    private volatile DiscordRouter router = new DiscordRouter(List.of());
 
     public DiscordManager(@Nonnull JDA jda) {
         this(jda, null);
@@ -81,6 +82,7 @@ public class DiscordManager {
         if(!jda.getGatewayIntents().containsAll(config.getIntents())){
             Logger.error("Discord config: JDA is missing one or more configured intents.");
             availableRoutes = List.of();
+            router = new DiscordRouter(List.of());
             return;
         }
 
@@ -88,21 +90,23 @@ public class DiscordManager {
         if(guild == null){
             Logger.error("Discord config: the configured guild is unavailable.");
             availableRoutes = List.of();
+            router = new DiscordRouter(List.of());
             return;
         }
 
-        List<DiscordConfig.Route> routes = new ArrayList<>();
-        for(DiscordConfig.Route route : config.getRoutes()){
+        List<DiscordRoute> routes = new ArrayList<>();
+        for(DiscordRoute route : config.getRoutes()){
             if(validateRoute(guild, route)) routes.add(route);
         }
         availableRoutes = List.copyOf(routes);
+        router = new DiscordRouter(availableRoutes);
     }
 
     private boolean validateRoute(
             @Nonnull Guild guild,
-            @Nonnull DiscordConfig.Route route
+            @Nonnull DiscordRoute route
     ) {
-        String routeName = route.type() == DiscordConfig.RouteType.GLOBAL
+        String routeName = route.type() == DiscordRoute.Type.GLOBAL
                 ? "GLOBAL"
                 : "LOCAL:" + route.backend();
         GuildChannel destination = guild.getJDA().getChannelById(GuildChannel.class, route.destinationId());

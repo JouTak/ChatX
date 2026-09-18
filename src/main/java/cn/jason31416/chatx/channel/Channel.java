@@ -108,6 +108,8 @@ public class Channel {
     @Getter
     private String id;
     @Getter
+    private String type;
+    @Getter
     private ChannelHandler handler;
     @Getter
     private List<String> restrictedServers = new ArrayList<>();
@@ -156,7 +158,8 @@ public class Channel {
                     channelConfig.rateLimiter = new RateLimiter(channelConfig.rateLimitTime*1000L, channelConfig.rateLimitCount);
                 Channel channel = new Channel(channelConfig);
                 channel.id = i;
-                channel.handler = channelTypes.get(Config.getChannelTree().getString(i + ".type").toLowerCase(Locale.ROOT)).apply(channel);
+                channel.type = Config.getChannelTree().getString(i + ".type").toLowerCase(Locale.ROOT);
+                channel.handler = channelTypes.get(channel.type).apply(channel);
                 if(Config.getChannelTree().contains(i + ".restricted-servers")) {
                     channel.restrictedServers = Config.getChannelTree().getStringList(i + ".restricted-servers");
                 }
