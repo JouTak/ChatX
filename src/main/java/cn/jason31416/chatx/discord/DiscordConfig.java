@@ -29,6 +29,7 @@ public class DiscordConfig {
     private final boolean enabled;
     private final String tokenEnvironment;
     private final String guildId;
+    private final boolean ignoreBots;
     private final List<DiscordRoute> routes;
     private final Formats formats;
     private final Events events;
@@ -41,6 +42,7 @@ public class DiscordConfig {
             boolean enabled,
             String tokenEnvironment,
             String guildId,
+            boolean ignoreBots,
             List<DiscordRoute> routes,
             Formats formats,
             Events events,
@@ -52,6 +54,7 @@ public class DiscordConfig {
         this.enabled = enabled;
         this.tokenEnvironment = tokenEnvironment;
         this.guildId = guildId;
+        this.ignoreBots = ignoreBots;
         this.routes = List.copyOf(routes);
         this.formats = formats;
         this.events = events;
@@ -65,6 +68,7 @@ public class DiscordConfig {
         boolean enabled = tree.getBoolean("enabled", false);
         String tokenEnvironment = tree.getString("token-env", "CHATX_DISCORD_TOKEN").trim();
         String guildId = tree.getString("guild-id", "").trim();
+        boolean ignoreBots = tree.getBoolean("ignore-bots", true);
         boolean connectionValid = true;
         boolean valid = true;
 
@@ -125,6 +129,7 @@ public class DiscordConfig {
                 enabled,
                 tokenEnvironment,
                 guildId,
+                ignoreBots,
                 routes,
                 formats,
                 events,

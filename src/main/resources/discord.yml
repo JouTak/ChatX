@@ -1,6 +1,7 @@
 enabled: false
 token-env: "CHATX_DISCORD_TOKEN"
 guild-id: ""
+ignore-bots: true
 
 # GLOBAL is the shared mc-live route. LOCAL routes are matched by Velocity backend ID.
 routes: []
