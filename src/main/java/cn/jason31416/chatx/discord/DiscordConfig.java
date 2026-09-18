@@ -19,7 +19,6 @@ import java.util.regex.Pattern;
 @Getter
 public class DiscordConfig {
     private static final Pattern DISCORD_ID = Pattern.compile("^[0-9]{17,20}$");
-    private static final Pattern ENVIRONMENT_VARIABLE = Pattern.compile("^[A-Za-z_][A-Za-z0-9_]*$");
     private static final Pattern WEBHOOK_PATH = Pattern.compile("^/api(?:/v[0-9]+)?/webhooks/[0-9]{17,20}/[^/]+/?$");
 
     private static final Set<GatewayIntent> INTENTS = Set.copyOf(EnumSet.of(
@@ -27,7 +26,7 @@ public class DiscordConfig {
             GatewayIntent.MESSAGE_CONTENT
     ));
     private final boolean enabled;
-    private final String tokenEnvironment;
+    private final String token;
     private final String guildId;
     private final boolean ignoreBots;
     private final List<DiscordRoute> routes;
@@ -40,7 +39,7 @@ public class DiscordConfig {
 
     private DiscordConfig(
             boolean enabled,
-            String tokenEnvironment,
+            String token,
             String guildId,
             boolean ignoreBots,
             List<DiscordRoute> routes,
@@ -52,7 +51,7 @@ public class DiscordConfig {
             boolean valid
     ) {
         this.enabled = enabled;
-        this.tokenEnvironment = tokenEnvironment;
+        this.token = token;
         this.guildId = guildId;
         this.ignoreBots = ignoreBots;
         this.routes = List.copyOf(routes);
@@ -66,14 +65,14 @@ public class DiscordConfig {
 
     public static DiscordConfig load(@Nonnull MapTree tree) {
         boolean enabled = tree.getBoolean("enabled", false);
-        String tokenEnvironment = tree.getString("token-env", "CHATX_DISCORD_TOKEN").trim();
+        String token = tree.getString("token", "").trim();
         String guildId = tree.getString("guild-id", "").trim();
         boolean ignoreBots = tree.getBoolean("ignore-bots", true);
         boolean connectionValid = true;
         boolean valid = true;
 
-        if(enabled && !ENVIRONMENT_VARIABLE.matcher(tokenEnvironment).matches()){
-            Logger.error("Discord config: token-env is not a valid environment variable name.");
+        if(enabled && token.isBlank()){
+            Logger.error("Discord config: token is empty.");
             connectionValid = false;
             valid = false;
         }
@@ -127,7 +126,7 @@ public class DiscordConfig {
 
         return new DiscordConfig(
                 enabled,
-                tokenEnvironment,
+                token,
                 guildId,
                 ignoreBots,
                 routes,

@@ -69,15 +69,8 @@ public class DiscordManager {
             Logger.warn("Discord config contains invalid values; valid routes will remain available.");
         }
 
-        String token = System.getenv(config.getTokenEnvironment());
-        if(token == null || token.isBlank()){
-            Logger.error("Discord integration is disabled because environment variable "
-                    + config.getTokenEnvironment() + " is empty.");
-            return null;
-        }
-
         try{
-            JDA jda = JDABuilder.createDefault(token, config.getIntents())
+            JDA jda = JDABuilder.createDefault(config.getToken(), config.getIntents())
                     .build();
             return new DiscordManager(jda, config);
         }catch (Exception e){

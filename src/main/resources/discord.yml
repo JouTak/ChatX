@@ -1,5 +1,5 @@
 enabled: false
-token-env: "CHATX_DISCORD_TOKEN"
+token: ""
 guild-id: ""
 ignore-bots: true
 
