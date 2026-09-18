@@ -3,7 +3,6 @@ package cn.jason31416.chatx.discord;
 import cn.jason31416.chatx.util.Logger;
 import cn.jason31416.chatx.util.MapTree;
 import lombok.Getter;
-import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.requests.GatewayIntent;
 
 import javax.annotation.Nonnull;
@@ -27,15 +26,6 @@ public class DiscordConfig {
             GatewayIntent.GUILD_MESSAGES,
             GatewayIntent.MESSAGE_CONTENT
     ));
-    private static final Set<Permission> REQUIRED_PERMISSIONS = Set.copyOf(EnumSet.of(
-            Permission.VIEW_CHANNEL,
-            Permission.MESSAGE_SEND,
-            Permission.MESSAGE_SEND_IN_THREADS,
-            Permission.MESSAGE_HISTORY,
-            Permission.MESSAGE_EMBED_LINKS,
-            Permission.MESSAGE_ATTACH_FILES
-    ));
-
     private final boolean enabled;
     private final String tokenEnvironment;
     private final String guildId;
@@ -147,10 +137,6 @@ public class DiscordConfig {
 
     public Set<GatewayIntent> getIntents() {
         return INTENTS;
-    }
-
-    public Set<Permission> getRequiredPermissions() {
-        return REQUIRED_PERMISSIONS;
     }
 
     @SuppressWarnings("unchecked")

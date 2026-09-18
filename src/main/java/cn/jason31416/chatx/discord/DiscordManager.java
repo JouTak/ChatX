@@ -7,6 +7,7 @@ import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.channel.concrete.ThreadChannel;
 import net.dv8tion.jda.api.entities.channel.middleman.GuildChannel;
+import net.dv8tion.jda.api.entities.channel.middleman.GuildMessageChannel;
 import net.dv8tion.jda.api.entities.channel.middleman.MessageChannel;
 import net.dv8tion.jda.api.events.session.ReadyEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
@@ -115,7 +116,7 @@ public class DiscordManager {
             return false;
         }
 
-        GuildChannel permissionChannel = destination;
+        GuildMessageChannel messageChannel;
         if(!route.threadId().isBlank()){
             ThreadChannel thread = guild.getJDA().getChannelById(ThreadChannel.class, route.threadId());
             if(thread == null
@@ -124,11 +125,16 @@ public class DiscordManager {
                 Logger.error("Discord config: route " + routeName + " points to an unavailable thread.");
                 return false;
             }
-            permissionChannel = thread;
+            messageChannel = thread;
+        }else if(destination instanceof GuildMessageChannel channel){
+            messageChannel = channel;
+        }else{
+            Logger.error("Discord config: route " + routeName + " destination cannot receive messages.");
+            return false;
         }
 
-        if(!guild.getSelfMember().hasPermission(permissionChannel, config.getRequiredPermissions())){
-            Logger.error("Discord config: bot permissions are insufficient for route " + routeName + ".");
+        if(!messageChannel.canTalk()){
+            Logger.error("Discord config: bot cannot send messages to route " + routeName + ".");
             return false;
         }
         return true;
