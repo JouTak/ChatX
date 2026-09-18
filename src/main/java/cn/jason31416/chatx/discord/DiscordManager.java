@@ -42,21 +42,23 @@ public class DiscordManager {
     private final Map<UUID, Queue<DiscordEvent>> pendingMinecraft = new ConcurrentHashMap<>();
 
     public DiscordManager(@Nonnull JDA jda) {
-        this(jda, null);
+        this.jda = jda;
+        this.config = null;
     }
 
-    private DiscordManager(@Nonnull JDA jda, DiscordConfig config) {
-        this.jda = jda;
+    private DiscordManager(@Nonnull DiscordConfig config) {
         this.config = config;
-        if(config != null){
-            jda.addEventListener(new DiscordMessageListener(this));
-            jda.addEventListener(new ListenerAdapter() {
-                @Override
-                public void onReady(@Nonnull ReadyEvent event) {
-                    validateConnection();
-                }
-            });
-        }
+        this.jda = JDABuilder.createDefault(config.getToken(), config.getIntents())
+                .addEventListeners(
+                        new DiscordMessageListener(this),
+                        new ListenerAdapter() {
+                            @Override
+                            public void onReady(@Nonnull ReadyEvent event) {
+                                validateConnection(event.getJDA());
+                            }
+                        }
+                )
+                .build();
     }
 
     public static DiscordManager create(@Nonnull DiscordConfig config) {
@@ -70,9 +72,7 @@ public class DiscordManager {
         }
 
         try{
-            JDA jda = JDABuilder.createDefault(config.getToken(), config.getIntents())
-                    .build();
-            return new DiscordManager(jda, config);
+            return new DiscordManager(config);
         }catch (Exception e){
             Logger.error("Failed to start Discord integration.");
             return null;
@@ -159,15 +159,15 @@ public class DiscordManager {
                 .anyMatch(url -> url.contains(webhookPath));
     }
 
-    private void validateConnection() {
-        if(!jda.getGatewayIntents().containsAll(config.getIntents())){
+    private void validateConnection(@Nonnull JDA readyJda) {
+        if(!readyJda.getGatewayIntents().containsAll(config.getIntents())){
             Logger.error("Discord config: JDA is missing one or more configured intents.");
             availableRoutes = List.of();
             router = new DiscordRouter(List.of());
             return;
         }
 
-        Guild guild = jda.getGuildById(config.getGuildId());
+        Guild guild = readyJda.getGuildById(config.getGuildId());
         if(guild == null){
             Logger.error("Discord config: the configured guild is unavailable.");
             availableRoutes = List.of();
