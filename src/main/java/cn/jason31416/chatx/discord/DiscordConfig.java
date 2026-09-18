@@ -3,7 +3,6 @@ package cn.jason31416.chatx.discord;
 import cn.jason31416.chatx.util.Logger;
 import cn.jason31416.chatx.util.MapTree;
 import lombok.Getter;
-import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.requests.GatewayIntent;
 
 import javax.annotation.Nonnull;
@@ -27,19 +26,10 @@ public class DiscordConfig {
             GatewayIntent.GUILD_MESSAGES,
             GatewayIntent.MESSAGE_CONTENT
     ));
-    private static final Set<Permission> REQUIRED_PERMISSIONS = Set.copyOf(EnumSet.of(
-            Permission.VIEW_CHANNEL,
-            Permission.MESSAGE_SEND,
-            Permission.MESSAGE_SEND_IN_THREADS,
-            Permission.MESSAGE_HISTORY,
-            Permission.MESSAGE_EMBED_LINKS,
-            Permission.MESSAGE_ATTACH_FILES
-    ));
-
     private final boolean enabled;
     private final String tokenEnvironment;
     private final String guildId;
-    private final List<Route> routes;
+    private final List<DiscordRoute> routes;
     private final Formats formats;
     private final Events events;
     private final String avatarUrl;
@@ -51,7 +41,7 @@ public class DiscordConfig {
             boolean enabled,
             String tokenEnvironment,
             String guildId,
-            List<Route> routes,
+            List<DiscordRoute> routes,
             Formats formats,
             Events events,
             String avatarUrl,
@@ -90,9 +80,9 @@ public class DiscordConfig {
         }
 
         RouteParseResult parsedRoutes = parseRoutes(tree.get("routes"), enabled);
-        List<Route> routes = parsedRoutes.routes();
+        List<DiscordRoute> routes = parsedRoutes.routes();
         valid &= parsedRoutes.valid();
-        if(enabled && routes.stream().noneMatch(route -> route.type() == RouteType.GLOBAL)){
+        if(enabled && routes.stream().noneMatch(route -> route.type() == DiscordRoute.Type.GLOBAL)){
             Logger.error("Discord config: one GLOBAL route is required.");
             valid = false;
         }
@@ -149,10 +139,6 @@ public class DiscordConfig {
         return INTENTS;
     }
 
-    public Set<Permission> getRequiredPermissions() {
-        return REQUIRED_PERMISSIONS;
-    }
-
     @SuppressWarnings("unchecked")
     private static RouteParseResult parseRoutes(Object rawRoutes, boolean enabled) {
         if(!(rawRoutes instanceof List<?> routeList)){
@@ -160,7 +146,7 @@ public class DiscordConfig {
             return new RouteParseResult(List.of(), !enabled);
         }
 
-        List<Route> routes = new ArrayList<>();
+        List<DiscordRoute> routes = new ArrayList<>();
         Set<String> routeKeys = new HashSet<>();
         Set<String> destinations = new HashSet<>();
         Set<String> webhooks = new HashSet<>();
@@ -175,9 +161,9 @@ public class DiscordConfig {
             }
 
             MapTree routeTree = new MapTree((Map<String, Object>) rawMap);
-            RouteType type;
+            DiscordRoute.Type type;
             try{
-                type = RouteType.valueOf(routeTree.getString("type").toUpperCase(Locale.ROOT));
+                type = DiscordRoute.Type.valueOf(routeTree.getString("type").toUpperCase(Locale.ROOT));
             }catch (IllegalArgumentException e){
                 Logger.error("Discord config: route " + index + " has an unknown type.");
                 valid = false;
@@ -188,11 +174,13 @@ public class DiscordConfig {
             String destinationId = routeTree.getString("destination-id", "").trim();
             String webhookUrl = routeTree.getString("webhook-url", "").trim();
             String threadId = routeTree.getString("thread-id", "").trim();
-            String routeKey = type == RouteType.GLOBAL ? "GLOBAL" : "LOCAL:" + backend;
+            String routeKey = type == DiscordRoute.Type.GLOBAL
+                    ? "GLOBAL"
+                    : "LOCAL:" + backend.toLowerCase(Locale.ROOT);
             String destinationKey = threadId.isBlank() ? destinationId : threadId;
             String webhookKey = webhookUrl + "#" + threadId;
 
-            if(type == RouteType.LOCAL && backend.isBlank()){
+            if(type == DiscordRoute.Type.LOCAL && backend.isBlank()){
                 Logger.error("Discord config: route " + index + " needs a backend ID.");
                 valid = false;
                 continue;
@@ -231,7 +219,7 @@ public class DiscordConfig {
             routeKeys.add(routeKey);
             destinations.add(destinationKey);
             if(!webhookUrl.isBlank()) webhooks.add(webhookKey);
-            routes.add(new Route(type, backend, destinationId, webhookUrl, threadId));
+            routes.add(new DiscordRoute(type, backend, destinationId, webhookUrl, threadId));
         }
         return new RouteParseResult(routes, valid);
     }
@@ -260,20 +248,7 @@ public class DiscordConfig {
                 || host.endsWith(".discordapp.com");
     }
 
-    private record RouteParseResult(List<Route> routes, boolean valid) {}
-
-    public enum RouteType {
-        GLOBAL,
-        LOCAL
-    }
-
-    public record Route(
-            RouteType type,
-            String backend,
-            String destinationId,
-            String webhookUrl,
-            String threadId
-    ) {}
+    private record RouteParseResult(List<DiscordRoute> routes, boolean valid) {}
 
     public record Formats(
             String chat,
