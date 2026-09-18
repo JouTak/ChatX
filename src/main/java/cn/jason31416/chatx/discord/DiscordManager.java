@@ -49,6 +49,7 @@ public class DiscordManager {
         this.jda = jda;
         this.config = config;
         if(config != null){
+            jda.addEventListener(new DiscordMessageListener(this));
             jda.addEventListener(new ListenerAdapter() {
                 @Override
                 public void onReady(@Nonnull ReadyEvent event) {
@@ -156,6 +157,13 @@ public class DiscordManager {
 
     private static String routeName(@Nonnull DiscordRoute route) {
         return route.type() == DiscordRoute.Type.GLOBAL ? "GLOBAL" : "LOCAL:" + route.backend();
+    }
+
+    boolean isChatXWebhook(@Nonnull String authorId) {
+        String webhookPath = "/webhooks/" + authorId + "/";
+        return config.getRoutes().stream()
+                .map(DiscordRoute::webhookUrl)
+                .anyMatch(url -> url.contains(webhookPath));
     }
 
     private void validateConnection() {
