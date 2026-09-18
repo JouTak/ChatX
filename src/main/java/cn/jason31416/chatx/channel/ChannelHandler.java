@@ -1,6 +1,7 @@
 package cn.jason31416.chatx.channel;
 
 import cn.jason31416.chatx.handler.PunishmentHandler;
+import cn.jason31416.chatx.discord.DiscordEvent;
 import cn.jason31416.chatx.util.TimeUtil;
 import com.velocitypowered.api.command.SimpleCommand;
 import com.velocitypowered.api.proxy.Player;
@@ -11,9 +12,18 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 public interface ChannelHandler {
     void handle(@Nonnull SimplePlayer player, @Nonnull String message);
+
+    default void handle(
+            @Nonnull SimplePlayer player,
+            @Nonnull String message,
+            @Nullable DiscordEvent discordEvent
+    ) {
+        handle(player, message);
+    }
 
     default void handleProcessed(@Nonnull SimplePlayer player, @Nonnull Component message) {
         handle(player, PlainTextComponentSerializer.plainText().serialize(message));

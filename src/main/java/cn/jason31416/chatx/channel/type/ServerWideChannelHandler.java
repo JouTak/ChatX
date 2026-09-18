@@ -3,9 +3,11 @@ package cn.jason31416.chatx.channel.type;
 import cn.jason31416.chatx.ChatX;
 import cn.jason31416.chatx.channel.Channel;
 import cn.jason31416.chatx.channel.ChannelHandler;
+import cn.jason31416.chatx.discord.DiscordManager;
 import cn.jason31416.chatx.handler.ChatHistoryManager;
 import cn.jason31416.chatx.handler.InteractiveChatBridge;
 import cn.jason31416.chatx.handler.InteractiveChatHook;
+import cn.jason31416.chatx.discord.DiscordEvent;
 import cn.jason31416.chatx.message.Message;
 import cn.jason31416.chatx.module.PatternModule;
 import cn.jason31416.chatx.util.PlaceholderUtil;
@@ -16,6 +18,7 @@ import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.util.List;
 import java.util.Objects;
 
@@ -37,6 +40,22 @@ public abstract class ServerWideChannelHandler implements ChannelHandler {
 
     @Override
     public void handle(@Nonnull SimplePlayer player, @Nonnull String message) {
+        DiscordEvent discordEvent = player.getPlayer() == null
+                ? null
+                : DiscordEvent.fromMinecraft(
+                        getChannel(),
+                        player.getPlayer(),
+                        player.getCurrentServer()
+                ).orElse(null);
+        handle(player, message, discordEvent);
+    }
+
+    @Override
+    public void handle(
+            @Nonnull SimplePlayer player,
+            @Nonnull String message,
+            @Nullable DiscordEvent discordEvent
+    ) {
         PlaceholderUtil.replacePlaceholders(getChannel().getConfig(player.getCurrentServer()).getFormat(), player.getPlayer())
                 .thenAccept(text->{
                     List<SimplePlayer> receivers = getReceivers(player);
@@ -54,6 +73,10 @@ public abstract class ServerWideChannelHandler implements ChannelHandler {
                         } else {
                             receiver.getPlayer().sendMessage(component, ChatType.CHAT.bind(component));
                         }
+                    }
+                    DiscordManager discordManager = ChatX.getDiscordManager();
+                    if(discordEvent != null && discordManager != null){
+                        discordManager.publishMinecraft(discordEvent, cmp);
                     }
                     if(getChannel().getConfig(player.getCurrentServer()).isLogToConsole()) ChatX.getProxy().getConsoleCommandSource().sendMessage(component);
                 });

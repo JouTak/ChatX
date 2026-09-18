@@ -1,6 +1,7 @@
 package cn.jason31416.chatx.channel;
 
 import cn.jason31416.chatx.channel.type.RedisChannelHandler;
+import cn.jason31416.chatx.discord.DiscordEvent;
 import cn.jason31416.chatx.util.Config;
 import cn.jason31416.chatx.util.Logger;
 import cn.jason31416.chatx.util.MapTree;
@@ -193,6 +194,15 @@ public class Channel {
     }
     public static void handleChat(Player player, Channel channel, String message){
         channel.getHandler().handle(new SimplePlayer(player), message);
+    }
+
+    public static void handleChat(
+            Player player,
+            Channel channel,
+            String message,
+            @Nullable DiscordEvent discordEvent
+    ) {
+        channel.getHandler().handle(new SimplePlayer(player), message, discordEvent);
     }
 
     public static void handleProcessedChat(Player player, Channel channel, Component message){

@@ -47,7 +47,7 @@ dependencies {
 }
 
 group = "cn.jason31416"
-version = "1.3.4"
+version = "1.3.5"
 description = "ChatXJT"
 java.sourceCompatibility = JavaVersion.VERSION_21
 var baseName: String = "ChatX-Beta"
