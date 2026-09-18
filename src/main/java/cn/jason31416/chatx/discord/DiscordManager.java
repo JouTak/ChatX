@@ -1,4 +1,4 @@
-package cn.jason31416.chatx.handler;
+package cn.jason31416.chatx.discord;
 
 import cn.jason31416.chatx.util.Logger;
 import lombok.Getter;
@@ -13,11 +13,14 @@ import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import net.dv8tion.jda.api.utils.messages.MessageCreateData;
 
 import javax.annotation.Nonnull;
+import java.util.ArrayList;
+import java.util.List;
 
 @Getter
 public class DiscordManager {
     private final JDA jda;
     private final DiscordConfig config;
+    private volatile List<DiscordConfig.Route> availableRoutes = List.of();
 
     public DiscordManager(@Nonnull JDA jda) {
         this(jda, null);
@@ -26,13 +29,24 @@ public class DiscordManager {
     private DiscordManager(@Nonnull JDA jda, DiscordConfig config) {
         this.jda = jda;
         this.config = config;
+        if(config != null){
+            jda.addEventListener(new ListenerAdapter() {
+                @Override
+                public void onReady(@Nonnull ReadyEvent event) {
+                    validateConnection();
+                }
+            });
+        }
     }
 
     public static DiscordManager create(@Nonnull DiscordConfig config) {
         if(!config.isEnabled()) return null;
-        if(!config.isValid()){
+        if(!config.isConnectionValid()){
             Logger.error("Discord integration is disabled because discord.yml is invalid.");
             return null;
+        }
+        if(!config.isValid()){
+            Logger.warn("Discord config contains invalid values; valid routes will remain available.");
         }
 
         String token = System.getenv(config.getTokenEnvironment());
@@ -44,12 +58,6 @@ public class DiscordManager {
 
         try{
             JDA jda = JDABuilder.createDefault(token, config.getIntents())
-                    .addEventListeners(new ListenerAdapter() {
-                        @Override
-                        public void onReady(@Nonnull ReadyEvent event) {
-                            validateConnection(event.getJDA(), config);
-                        }
-                    })
                     .build();
             return new DiscordManager(jda, config);
         }catch (Exception e){
@@ -66,29 +74,33 @@ public class DiscordManager {
     }
 
     public void shutdown() {
-        jda.shutdown();
+        jda.shutdownNow();
     }
 
-    private static void validateConnection(@Nonnull JDA jda, @Nonnull DiscordConfig config) {
+    private void validateConnection() {
         if(!jda.getGatewayIntents().containsAll(config.getIntents())){
             Logger.error("Discord config: JDA is missing one or more configured intents.");
+            availableRoutes = List.of();
+            return;
         }
 
         Guild guild = jda.getGuildById(config.getGuildId());
         if(guild == null){
             Logger.error("Discord config: the configured guild is unavailable.");
+            availableRoutes = List.of();
             return;
         }
 
+        List<DiscordConfig.Route> routes = new ArrayList<>();
         for(DiscordConfig.Route route : config.getRoutes()){
-            validateRoute(guild, route, config);
+            if(validateRoute(guild, route)) routes.add(route);
         }
+        availableRoutes = List.copyOf(routes);
     }
 
-    private static void validateRoute(
+    private boolean validateRoute(
             @Nonnull Guild guild,
-            @Nonnull DiscordConfig.Route route,
-            @Nonnull DiscordConfig config
+            @Nonnull DiscordConfig.Route route
     ) {
         String routeName = route.type() == DiscordConfig.RouteType.GLOBAL
                 ? "GLOBAL"
@@ -96,7 +108,7 @@ public class DiscordManager {
         GuildChannel destination = guild.getJDA().getChannelById(GuildChannel.class, route.destinationId());
         if(destination == null || !destination.getGuild().equals(guild)){
             Logger.error("Discord config: route " + routeName + " points to an unavailable destination.");
-            return;
+            return false;
         }
 
         GuildChannel permissionChannel = destination;
@@ -106,13 +118,15 @@ public class DiscordManager {
                     || !thread.getGuild().equals(guild)
                     || !thread.getParentChannel().getId().equals(destination.getId())){
                 Logger.error("Discord config: route " + routeName + " points to an unavailable thread.");
-                return;
+                return false;
             }
             permissionChannel = thread;
         }
 
-        if(!guild.getSelfMember().hasPermission(permissionChannel, config.getPermissions())){
+        if(!guild.getSelfMember().hasPermission(permissionChannel, config.getRequiredPermissions())){
             Logger.error("Discord config: bot permissions are insufficient for route " + routeName + ".");
+            return false;
         }
+        return true;
     }
 }

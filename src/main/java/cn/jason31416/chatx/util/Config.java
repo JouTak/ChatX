@@ -142,6 +142,7 @@ public class Config {
             discordTree = loadDiscordTree(discord);
         }catch (Exception e){
             Logger.error("Failed to load discord.yml: " + e.getMessage());
+            discordTree = new MapTree();
         }
     }
 

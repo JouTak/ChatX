@@ -21,6 +21,8 @@ import cn.jason31416.chatx.command.ChatHistoryCommand;
 import cn.jason31416.chatx.command.DirectMessageCommand;
 import cn.jason31416.chatx.command.OnlineCommand;
 import cn.jason31416.chatx.command.ChatXCommand;
+import cn.jason31416.chatx.discord.DiscordConfig;
+import cn.jason31416.chatx.discord.DiscordManager;
 import cn.jason31416.chatx.handler.*;
 import cn.jason31416.chatx.message.MessageLoader;
 import cn.jason31416.chatx.module.PatternModule;

@@ -2,18 +2,6 @@ enabled: false
 token-env: "CHATX_DISCORD_TOKEN"
 guild-id: ""
 
-intents:
-  - GUILD_MESSAGES
-  - MESSAGE_CONTENT
-
-required-permissions:
-  - VIEW_CHANNEL
-  - MESSAGE_SEND
-  - MESSAGE_SEND_IN_THREADS
-  - MESSAGE_HISTORY
-  - MESSAGE_EMBED_LINKS
-  - MESSAGE_ATTACH_FILES
-
 # GLOBAL is the shared mc-live route. LOCAL routes are matched by Velocity backend ID.
 routes: []
 #  - type: GLOBAL
@@ -32,7 +20,7 @@ formats:
   attachments: "{url}"
   join: ":arrow_right: **{name}** joined the network"
   leave: ":arrow_left: **{name}** left the network"
-  switch: ":left_right_arrow: **{name}** moved to {server}"
+  switch: ":left_right_arrow: **{name}** moved from {previous-server} to {server}"
   start: ":white_check_mark: Network started"
   stop: ":octagonal_sign: Network stopped"
   presence: "{online} players online"
@@ -43,6 +31,6 @@ default-nickname-color: "#47BFFB"
 events:
   join: true
   leave: true
-  switch: true
+  switch: false
   start: true
   stop: true

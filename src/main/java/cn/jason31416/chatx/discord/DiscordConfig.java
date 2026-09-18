@@ -1,4 +1,4 @@
-package cn.jason31416.chatx.handler;
+package cn.jason31416.chatx.discord;
 
 import cn.jason31416.chatx.util.Logger;
 import cn.jason31416.chatx.util.MapTree;
@@ -23,41 +23,51 @@ public class DiscordConfig {
     private static final Pattern ENVIRONMENT_VARIABLE = Pattern.compile("^[A-Za-z_][A-Za-z0-9_]*$");
     private static final Pattern WEBHOOK_PATH = Pattern.compile("^/api(?:/v[0-9]+)?/webhooks/[0-9]{17,20}/[^/]+/?$");
 
+    private static final Set<GatewayIntent> INTENTS = Set.copyOf(EnumSet.of(
+            GatewayIntent.GUILD_MESSAGES,
+            GatewayIntent.MESSAGE_CONTENT
+    ));
+    private static final Set<Permission> REQUIRED_PERMISSIONS = Set.copyOf(EnumSet.of(
+            Permission.VIEW_CHANNEL,
+            Permission.MESSAGE_SEND,
+            Permission.MESSAGE_SEND_IN_THREADS,
+            Permission.MESSAGE_HISTORY,
+            Permission.MESSAGE_EMBED_LINKS,
+            Permission.MESSAGE_ATTACH_FILES
+    ));
+
     private final boolean enabled;
     private final String tokenEnvironment;
     private final String guildId;
-    private final Set<GatewayIntent> intents;
-    private final Set<Permission> permissions;
     private final List<Route> routes;
     private final Formats formats;
     private final Events events;
     private final String avatarUrl;
     private final String defaultNicknameColor;
+    private final boolean connectionValid;
     private final boolean valid;
 
     private DiscordConfig(
             boolean enabled,
             String tokenEnvironment,
             String guildId,
-            Set<GatewayIntent> intents,
-            Set<Permission> permissions,
             List<Route> routes,
             Formats formats,
             Events events,
             String avatarUrl,
             String defaultNicknameColor,
+            boolean connectionValid,
             boolean valid
     ) {
         this.enabled = enabled;
         this.tokenEnvironment = tokenEnvironment;
         this.guildId = guildId;
-        this.intents = Set.copyOf(intents);
-        this.permissions = Set.copyOf(permissions);
         this.routes = List.copyOf(routes);
         this.formats = formats;
         this.events = events;
         this.avatarUrl = avatarUrl;
         this.defaultNicknameColor = defaultNicknameColor;
+        this.connectionValid = connectionValid;
         this.valid = valid;
     }
 
@@ -65,46 +75,26 @@ public class DiscordConfig {
         boolean enabled = tree.getBoolean("enabled", false);
         String tokenEnvironment = tree.getString("token-env", "CHATX_DISCORD_TOKEN").trim();
         String guildId = tree.getString("guild-id", "").trim();
+        boolean connectionValid = true;
         boolean valid = true;
 
         if(enabled && !ENVIRONMENT_VARIABLE.matcher(tokenEnvironment).matches()){
             Logger.error("Discord config: token-env is not a valid environment variable name.");
+            connectionValid = false;
             valid = false;
         }
         if(enabled && !isDiscordId(guildId)){
             Logger.error("Discord config: guild-id is not a valid Discord ID.");
+            connectionValid = false;
             valid = false;
         }
 
-        ParsedEnums<GatewayIntent> parsedIntents = parseEnums(
-                tree.get("intents"),
-                GatewayIntent.class,
-                "intent",
-                enabled
-        );
-        EnumSet<GatewayIntent> intents = parsedIntents.values();
-        valid &= parsedIntents.valid();
-        if(enabled && intents.isEmpty()){
-            Logger.error("Discord config: at least one intent is required.");
-            valid = false;
-        }
-
-        ParsedEnums<Permission> parsedPermissions = parseEnums(
-                tree.get("required-permissions"),
-                Permission.class,
-                "permission",
-                enabled
-        );
-        EnumSet<Permission> permissions = parsedPermissions.values();
-        valid &= parsedPermissions.valid();
-        if(enabled && permissions.isEmpty()){
-            Logger.error("Discord config: at least one required permission is required.");
-            valid = false;
-        }
-
-        List<Route> routes = parseRoutes(tree.get("routes"), enabled);
+        RouteParseResult parsedRoutes = parseRoutes(tree.get("routes"), enabled);
+        List<Route> routes = parsedRoutes.routes();
+        valid &= parsedRoutes.valid();
         if(enabled && routes.stream().noneMatch(route -> route.type() == RouteType.GLOBAL)){
             Logger.error("Discord config: one GLOBAL route is required.");
+            valid = false;
         }
 
         MapTree formatTree = tree.getSection("formats");
@@ -114,7 +104,7 @@ public class DiscordConfig {
                 formatTree.getString("attachments", "{url}"),
                 formatTree.getString("join", ":arrow_right: **{name}** joined the network"),
                 formatTree.getString("leave", ":arrow_left: **{name}** left the network"),
-                formatTree.getString("switch", ":left_right_arrow: **{name}** moved to {server}"),
+                formatTree.getString("switch", ":left_right_arrow: **{name}** moved from {previous-server} to {server}"),
                 formatTree.getString("start", ":white_check_mark: Network started"),
                 formatTree.getString("stop", ":octagonal_sign: Network stopped"),
                 formatTree.getString("presence", "{online} players online")
@@ -124,7 +114,7 @@ public class DiscordConfig {
         Events events = new Events(
                 eventTree.getBoolean("join", true),
                 eventTree.getBoolean("leave", true),
-                eventTree.getBoolean("switch", true),
+                eventTree.getBoolean("switch", false),
                 eventTree.getBoolean("start", true),
                 eventTree.getBoolean("stop", true)
         );
@@ -145,62 +135,42 @@ public class DiscordConfig {
                 enabled,
                 tokenEnvironment,
                 guildId,
-                intents,
-                permissions,
                 routes,
                 formats,
                 events,
                 avatarUrl,
                 defaultNicknameColor,
+                connectionValid,
                 valid
         );
     }
 
-    private static <E extends Enum<E>> ParsedEnums<E> parseEnums(
-            Object rawValues,
-            Class<E> enumClass,
-            String valueName,
-            boolean required
-    ) {
-        EnumSet<E> result = EnumSet.noneOf(enumClass);
-        if(!(rawValues instanceof List<?> values)){
-            if(required) Logger.error("Discord config: " + valueName + "s must be a list.");
-            return new ParsedEnums<>(result, !required);
-        }
+    public Set<GatewayIntent> getIntents() {
+        return INTENTS;
+    }
 
-        boolean valid = true;
-        for(Object rawValue : values){
-            if(!(rawValue instanceof String value)){
-                Logger.error("Discord config: " + valueName + " values must be strings.");
-                valid = false;
-                continue;
-            }
-            try{
-                result.add(Enum.valueOf(enumClass, value.toUpperCase(Locale.ROOT)));
-            }catch (IllegalArgumentException e){
-                Logger.error("Discord config: unknown " + valueName + " " + value + ".");
-                valid = false;
-            }
-        }
-        return new ParsedEnums<>(result, valid);
+    public Set<Permission> getRequiredPermissions() {
+        return REQUIRED_PERMISSIONS;
     }
 
     @SuppressWarnings("unchecked")
-    private static List<Route> parseRoutes(Object rawRoutes, boolean enabled) {
+    private static RouteParseResult parseRoutes(Object rawRoutes, boolean enabled) {
         if(!(rawRoutes instanceof List<?> routeList)){
             if(enabled) Logger.error("Discord config: routes must be a list.");
-            return List.of();
+            return new RouteParseResult(List.of(), !enabled);
         }
 
         List<Route> routes = new ArrayList<>();
         Set<String> routeKeys = new HashSet<>();
         Set<String> destinations = new HashSet<>();
         Set<String> webhooks = new HashSet<>();
+        boolean valid = true;
         int index = 0;
         for(Object rawRoute : routeList){
             index++;
             if(!(rawRoute instanceof Map<?, ?> rawMap)){
                 Logger.error("Discord config: route " + index + " must be a section.");
+                valid = false;
                 continue;
             }
 
@@ -210,6 +180,7 @@ public class DiscordConfig {
                 type = RouteType.valueOf(routeTree.getString("type").toUpperCase(Locale.ROOT));
             }catch (IllegalArgumentException e){
                 Logger.error("Discord config: route " + index + " has an unknown type.");
+                valid = false;
                 continue;
             }
 
@@ -223,30 +194,37 @@ public class DiscordConfig {
 
             if(type == RouteType.LOCAL && backend.isBlank()){
                 Logger.error("Discord config: route " + index + " needs a backend ID.");
+                valid = false;
                 continue;
             }
             if(!isDiscordId(destinationId)){
                 Logger.error("Discord config: route " + routeKey + " has an invalid destination ID.");
+                valid = false;
                 continue;
             }
             if(!threadId.isBlank() && !isDiscordId(threadId)){
                 Logger.error("Discord config: route " + routeKey + " has an invalid thread ID.");
+                valid = false;
                 continue;
             }
             if(!webhookUrl.isBlank() && !isWebhookUrl(webhookUrl)){
                 Logger.error("Discord config: route " + routeKey + " has an invalid webhook URL.");
+                valid = false;
                 continue;
             }
             if(routeKeys.contains(routeKey)){
                 Logger.error("Discord config: duplicate route " + routeKey + ".");
+                valid = false;
                 continue;
             }
             if(destinations.contains(destinationKey)){
                 Logger.error("Discord config: route " + routeKey + " duplicates a destination.");
+                valid = false;
                 continue;
             }
             if(!webhookUrl.isBlank() && webhooks.contains(webhookKey)){
                 Logger.error("Discord config: route " + routeKey + " duplicates a webhook.");
+                valid = false;
                 continue;
             }
 
@@ -255,7 +233,7 @@ public class DiscordConfig {
             if(!webhookUrl.isBlank()) webhooks.add(webhookKey);
             routes.add(new Route(type, backend, destinationId, webhookUrl, threadId));
         }
-        return routes;
+        return new RouteParseResult(routes, valid);
     }
 
     private static boolean isDiscordId(String value) {
@@ -282,7 +260,7 @@ public class DiscordConfig {
                 || host.endsWith(".discordapp.com");
     }
 
-    private record ParsedEnums<E extends Enum<E>>(EnumSet<E> values, boolean valid) {}
+    private record RouteParseResult(List<Route> routes, boolean valid) {}
 
     public enum RouteType {
         GLOBAL,
