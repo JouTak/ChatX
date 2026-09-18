@@ -1,16 +1,19 @@
 package cn.jason31416.chatx.handler;
 
 import cn.jason31416.chatx.util.*;
+import cn.jason31416.chatx.discord.DiscordEvent;
 import com.velocitypowered.api.event.Subscribe;
 import com.velocitypowered.api.event.connection.DisconnectEvent;
 import com.velocitypowered.api.event.connection.LoginEvent;
 import com.velocitypowered.api.event.player.PlayerChatEvent;
 import com.velocitypowered.api.network.ProtocolVersion;
+import com.velocitypowered.api.proxy.Player;
 import com.velocitypowered.api.proxy.ServerConnection;
 import com.velocitypowered.api.proxy.server.ServerInfo;
 import cn.jason31416.chatx.ChatX;
 import cn.jason31416.chatx.channel.Channel;
 import cn.jason31416.chatx.command.DirectMessageCommand;
+import cn.jason31416.chatx.discord.DiscordManager;
 import cn.jason31416.chatx.message.Message;
 import cn.jason31416.chatx.module.PatternModule;
 import net.kyori.adventure.text.Component;
@@ -68,8 +71,13 @@ public class EventListener {
 
         if (prefixedChannel) {
             Channel selectedChannel = channel;
+            DiscordEvent discordEvent = DiscordEvent.fromMinecraft(
+                    selectedChannel,
+                    event.getPlayer(),
+                    serverid
+            ).orElse(null);
             ChatX.getProxy().getScheduler().buildTask(ChatX.getInstance(), () ->
-                    Channel.handleChat(event.getPlayer(), selectedChannel, message)
+                    Channel.handleChat(event.getPlayer(), selectedChannel, message, discordEvent)
             ).schedule();
             event.setResult(PlayerChatEvent.ChatResult.denied());
             return;
@@ -83,13 +91,20 @@ public class EventListener {
             return;
         }else if(channel.getConfig(serverid).getHandleMode() == Channel.HandleMode.NOTIFY_BACKEND){
             // Let the backend produce the final component. ChatPacketListener will redistribute it.
+            queueDiscordEvent(channel, event.getPlayer(), serverid);
             return;
         }else if(channel.getConfig(serverid).getHandleMode() == Channel.HandleMode.RESPECT_BACKEND){
             // Allow the packet to passthrough
+            queueDiscordEvent(channel, event.getPlayer(), serverid);
             return;
         }else if(channel.getConfig(serverid).getHandleMode() == Channel.HandleMode.IGNORE_BACKEND){
+            DiscordEvent discordEvent = DiscordEvent.fromMinecraft(
+                    channel,
+                    event.getPlayer(),
+                    serverid
+            ).orElse(null);
             ChatX.getProxy().getScheduler().buildTask(ChatX.getInstance(), ()->{
-                Channel.handleChat(event.getPlayer(), channel, message);
+                Channel.handleChat(event.getPlayer(), channel, message, discordEvent);
             }).schedule();
             event.setResult(PlayerChatEvent.ChatResult.denied());
             return;
@@ -98,6 +113,18 @@ public class EventListener {
         }
 
     }
+
+    private void queueDiscordEvent(
+            @Nonnull Channel channel,
+            @Nonnull Player player,
+            @Nonnull String backend
+    ) {
+        DiscordManager discordManager = ChatX.getDiscordManager();
+        if(discordManager == null) return;
+        DiscordEvent.fromMinecraft(channel, player, backend)
+                .ifPresent(discordManager::queueMinecraft);
+    }
+
     @Subscribe
     public void onPlayerJoin(@Nonnull LoginEvent event){
         Channel.getPlayerChannels().put(event.getPlayer().getUniqueId(), Channel.defaultChannel);
@@ -105,6 +132,9 @@ public class EventListener {
 
     @Subscribe
     public void onPlayerLeave(@Nonnull DisconnectEvent event){
+        if(ChatX.getDiscordManager() != null){
+            ChatX.getDiscordManager().discardMinecraft(event.getPlayer().getUniqueId());
+        }
         Channel.getPlayerChannels().remove(event.getPlayer().getUniqueId());
         PlayerData.getPlayerDataMap().remove(event.getPlayer().getUniqueId());
         DirectMessageCommand.lastMessage.remove(event.getPlayer().getUniqueId());

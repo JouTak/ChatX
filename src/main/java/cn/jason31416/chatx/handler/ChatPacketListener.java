@@ -2,6 +2,8 @@ package cn.jason31416.chatx.handler;
 
 import cn.jason31416.chatx.ChatX;
 import cn.jason31416.chatx.channel.Channel;
+import cn.jason31416.chatx.discord.DiscordEvent;
+import cn.jason31416.chatx.discord.DiscordManager;
 import cn.jason31416.chatx.util.Config;
 import cn.jason31416.chatx.util.Logger;
 import com.github.retrooper.packetevents.PacketEvents;
@@ -118,6 +120,12 @@ public class ChatPacketListener extends SimplePacketListenerAbstract {
                     attemptRewriteSignedPacket(event);
                 event.setCancelled(true);
                 return;
+            }
+
+            DiscordManager discordManager = ChatX.getDiscordManager();
+            if(discordManager != null){
+                DiscordEvent discordEvent = discordManager.pollMinecraft(player.getUniqueId());
+                if(discordEvent != null) discordManager.publishMinecraft(discordEvent, message);
             }
 
             Channel channel = Channel.getPlayerChannel(player);
