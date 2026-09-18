@@ -30,6 +30,8 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 
 @Getter
 public class DiscordManager {
+    private static final long PENDING_MINECRAFT_TTL_MILLIS = 10_000L;
+
     private final JDA jda;
     private final DiscordConfig config;
     private volatile List<DiscordRoute> availableRoutes = List.of();
@@ -100,7 +102,11 @@ public class DiscordManager {
     public DiscordEvent pollMinecraft(@Nonnull UUID playerUuid) {
         Queue<DiscordEvent> events = pendingMinecraft.get(playerUuid);
         if(events == null) return null;
-        DiscordEvent event = events.poll();
+        long expiredBefore = System.currentTimeMillis() - PENDING_MINECRAFT_TTL_MILLIS;
+        DiscordEvent event;
+        do{
+            event = events.poll();
+        }while (event != null && event.createdAt() < expiredBefore);
         if(events.isEmpty()) pendingMinecraft.remove(playerUuid, events);
         return event;
     }

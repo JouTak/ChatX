@@ -12,7 +12,8 @@ public record DiscordEvent(
         @Nonnull DiscordRoute.Type type,
         @Nonnull String backend,
         @Nonnull UUID playerUuid,
-        @Nonnull String playerName
+        @Nonnull String playerName,
+        long createdAt
 ) {
     public static Optional<DiscordEvent> fromMinecraft(
             @Nonnull Channel channel,
@@ -27,6 +28,12 @@ public record DiscordEvent(
         }catch (IllegalArgumentException e){
             return Optional.empty();
         }
-        return Optional.of(new DiscordEvent(type, backend, player.getUniqueId(), player.getUsername()));
+        return Optional.of(new DiscordEvent(
+                type,
+                backend,
+                player.getUniqueId(),
+                player.getUsername(),
+                System.currentTimeMillis()
+        ));
     }
 }
