@@ -21,6 +21,8 @@ import cn.jason31416.chatx.command.ChatHistoryCommand;
 import cn.jason31416.chatx.command.DirectMessageCommand;
 import cn.jason31416.chatx.command.OnlineCommand;
 import cn.jason31416.chatx.command.ChatXCommand;
+import cn.jason31416.chatx.discord.DiscordConfig;
+import cn.jason31416.chatx.discord.DiscordManager;
 import cn.jason31416.chatx.handler.*;
 import cn.jason31416.chatx.message.MessageLoader;
 import cn.jason31416.chatx.module.PatternModule;
@@ -40,7 +42,7 @@ import java.util.concurrent.TimeUnit;
 @Plugin(
         id = "chatx",
         name = "ChatXJT",
-        version = "1.3.2",
+        version = "1.3.3",
         authors = {
                 "EnderDissa"
         },
@@ -61,6 +63,10 @@ public class ChatX {
     private static File dataDirectory;
     @Getter
     private static InteractiveChatBridge interactiveChatBridge;
+    @Getter
+    private static DiscordConfig discordConfig;
+    @Getter
+    private static DiscordManager discordManager;
 
     @Inject
     public ChatX(@Nonnull ProxyServer proxy, @Nonnull Logger logger, @Nonnull @DataDirectory Path dataDirectory) {
@@ -77,6 +83,8 @@ public class ChatX {
         interactiveChatBridge = new InteractiveChatBridge();
         proxy.getEventManager().register(this, interactiveChatBridge);
         Config.init();
+        discordConfig = DiscordConfig.load(Config.getDiscordTree());
+        discordManager = DiscordManager.create(discordConfig);
         MessageLoader.initialize();
 
         if(Config.getConfigTree().getBoolean("redis.enabled", false)){
@@ -121,6 +129,9 @@ public class ChatX {
 
     public static void reload() {
         Config.reload();
+        discordConfig = DiscordConfig.load(Config.getDiscordTree());
+        if(discordManager != null) discordManager.shutdown();
+        discordManager = DiscordManager.create(discordConfig);
         MessageLoader.initialize();
 
         if(Config.getConfigTree().getBoolean("redis.enabled", false)){
@@ -153,6 +164,7 @@ public class ChatX {
     @Subscribe
     public void onProxyShutdown(@Nonnull ProxyShutdownEvent event) {
         if(RedisRemoteManager.getInstance()!=null) RedisRemoteManager.getInstance().shutdown();
+        if(discordManager != null) discordManager.shutdown();
         PacketEvents.getAPI().terminate();
     }
 }

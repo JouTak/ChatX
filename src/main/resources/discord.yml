@@ -1,0 +1,36 @@
+enabled: false
+token-env: "CHATX_DISCORD_TOKEN"
+guild-id: ""
+
+# GLOBAL is the shared mc-live route. LOCAL routes are matched by Velocity backend ID.
+routes: []
+#  - type: GLOBAL
+#    destination-id: ""
+#    webhook-url: ""
+#    thread-id: ""
+#  - type: LOCAL
+#    backend: "survival"
+#    destination-id: ""
+#    webhook-url: ""
+#    thread-id: ""
+
+formats:
+  chat: "**{name}**: {message}"
+  reply: "**{name}** replied to **{reply-name}**: {message}"
+  attachments: "{url}"
+  join: ":arrow_right: **{name}** joined the network"
+  leave: ":arrow_left: **{name}** left the network"
+  switch: ":left_right_arrow: **{name}** moved from {previous-server} to {server}"
+  start: ":white_check_mark: Network started"
+  stop: ":octagonal_sign: Network stopped"
+  presence: "{online} players online"
+
+avatar-url: "https://mc-heads.net/avatar/{uuid}/64"
+default-nickname-color: "#47BFFB"
+
+events:
+  join: true
+  leave: true
+  switch: false
+  start: true
+  stop: true
