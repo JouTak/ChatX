@@ -23,6 +23,7 @@ import cn.jason31416.chatx.command.OnlineCommand;
 import cn.jason31416.chatx.command.ChatXCommand;
 import cn.jason31416.chatx.discord.DiscordConfig;
 import cn.jason31416.chatx.discord.DiscordManager;
+import cn.jason31416.chatx.discord.DiscordNetworkListener;
 import cn.jason31416.chatx.handler.*;
 import cn.jason31416.chatx.message.MessageLoader;
 import cn.jason31416.chatx.module.PatternModule;
@@ -42,7 +43,7 @@ import java.util.concurrent.TimeUnit;
 @Plugin(
         id = "chatx",
         name = "ChatXJT",
-        version = "1.3.6",
+        version = "1.3.7",
         authors = {
                 "EnderDissa"
         },
@@ -84,7 +85,8 @@ public class ChatX {
         proxy.getEventManager().register(this, interactiveChatBridge);
         Config.init();
         discordConfig = DiscordConfig.load(Config.getDiscordTree());
-        discordManager = DiscordManager.create(discordConfig);
+        discordManager = DiscordManager.create(discordConfig, true);
+        proxy.getEventManager().register(this, new DiscordNetworkListener());
         MessageLoader.initialize();
 
         if(Config.getConfigTree().getBoolean("redis.enabled", false)){
@@ -130,8 +132,8 @@ public class ChatX {
     public static void reload() {
         Config.reload();
         discordConfig = DiscordConfig.load(Config.getDiscordTree());
-        if(discordManager != null) discordManager.shutdown();
-        discordManager = DiscordManager.create(discordConfig);
+        if(discordManager != null) discordManager.shutdown(false);
+        discordManager = DiscordManager.create(discordConfig, false);
         MessageLoader.initialize();
 
         if(Config.getConfigTree().getBoolean("redis.enabled", false)){
@@ -164,7 +166,7 @@ public class ChatX {
     @Subscribe
     public void onProxyShutdown(@Nonnull ProxyShutdownEvent event) {
         if(RedisRemoteManager.getInstance()!=null) RedisRemoteManager.getInstance().shutdown();
-        if(discordManager != null) discordManager.shutdown();
+        if(discordManager != null) discordManager.shutdown(true);
         PacketEvents.getAPI().terminate();
     }
 }
