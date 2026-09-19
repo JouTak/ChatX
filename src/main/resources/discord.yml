@@ -21,6 +21,8 @@ formats:
   attachments: "{url}"
   join: ":arrow_right: **{name}** joined the network"
   leave: ":arrow_left: **{name}** left the network"
+  server-join: ":arrow_right: **{name}** joined {server}"
+  server-leave: ":arrow_left: **{name}** left {server}"
   switch: ":left_right_arrow: **{name}** moved from {previous-server} to {server}"
   start: ":white_check_mark: Network started"
   stop: ":octagonal_sign: Network stopped"

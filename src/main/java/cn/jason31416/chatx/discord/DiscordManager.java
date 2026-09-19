@@ -1,10 +1,13 @@
 package cn.jason31416.chatx.discord;
 
+import cn.jason31416.chatx.ChatX;
 import cn.jason31416.chatx.util.Logger;
+import com.velocitypowered.api.proxy.Player;
 import lombok.AccessLevel;
 import lombok.Getter;
 import net.dv8tion.jda.api.JDABuilder;
 import net.dv8tion.jda.api.JDA;
+import net.dv8tion.jda.api.entities.Activity;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.IncomingWebhookClient;
 import net.dv8tion.jda.api.entities.WebhookClient;
@@ -34,6 +37,7 @@ public class DiscordManager {
 
     private final JDA jda;
     private final DiscordConfig config;
+    private final boolean lifecycleEvents;
     private volatile List<DiscordRoute> availableRoutes = List.of();
     private volatile DiscordRouter router = new DiscordRouter(List.of());
     @Getter(AccessLevel.NONE)
@@ -44,10 +48,12 @@ public class DiscordManager {
     public DiscordManager(@Nonnull JDA jda) {
         this.jda = jda;
         this.config = null;
+        this.lifecycleEvents = false;
     }
 
-    private DiscordManager(@Nonnull DiscordConfig config) {
+    private DiscordManager(@Nonnull DiscordConfig config, boolean lifecycleEvents) {
         this.config = config;
+        this.lifecycleEvents = lifecycleEvents;
         this.jda = JDABuilder.createDefault(config.getToken(), config.getIntents())
                 .addEventListeners(
                         new DiscordMessageListener(this),
@@ -55,13 +61,18 @@ public class DiscordManager {
                             @Override
                             public void onReady(@Nonnull ReadyEvent event) {
                                 validateConnection(event.getJDA());
+                                updatePresence();
+                                if(lifecycleEvents) publishStart();
                             }
                         }
                 )
                 .build();
     }
 
-    public static DiscordManager create(@Nonnull DiscordConfig config) {
+    public static DiscordManager create(
+            @Nonnull DiscordConfig config,
+            boolean lifecycleEvents
+    ) {
         if(!config.isEnabled()) return null;
         if(!config.isConnectionValid()){
             Logger.error("Discord integration is disabled because discord.yml is invalid.");
@@ -72,7 +83,7 @@ public class DiscordManager {
         }
 
         try{
-            return new DiscordManager(config);
+            return new DiscordManager(config, lifecycleEvents);
         }catch (Exception e){
             Logger.error("Failed to start Discord integration.");
             return null;
@@ -84,6 +95,57 @@ public class DiscordManager {
         if(channel == null) return false;
         channel.sendMessage(message).queue();
         return true;
+    }
+
+    public void publishNetworkJoin(@Nonnull Player player) {
+        if(!config.getEvents().join()) return;
+        publishEvent(router.routeGlobal().orElse(null), formatPlayer(config.getFormats().join(), player, "", ""), false);
+    }
+
+    public void publishBackendJoin(@Nonnull Player player, @Nonnull String backend) {
+        if(!config.getEvents().join()) return;
+        publishEvent(router.routeLocal(backend).orElse(null), formatPlayer(config.getFormats().serverJoin(), player, "", backend), false);
+    }
+
+    public void publishNetworkLeave(@Nonnull Player player, @Nullable String backend) {
+        if(!config.getEvents().leave()) return;
+        publishEvent(router.routeGlobal().orElse(null), formatPlayer(config.getFormats().leave(), player, "", ""), false);
+        if(backend != null){
+            publishEvent(
+                    router.routeLocal(backend).orElse(null),
+                    formatPlayer(config.getFormats().serverLeave(), player, backend, backend),
+                    false
+            );
+        }
+    }
+
+    public void publishServerSwitch(
+            @Nonnull Player player,
+            @Nonnull String previousBackend,
+            @Nonnull String backend
+    ) {
+        if(!config.getEvents().serverSwitch()) return;
+        String message = formatPlayer(config.getFormats().serverSwitch(), player, previousBackend, backend);
+        publishEvent(router.routeGlobal().orElse(null), message, false);
+        publishEvent(
+                router.routeLocal(previousBackend).orElse(null),
+                formatPlayer(config.getFormats().serverLeave(), player, previousBackend, previousBackend),
+                false
+        );
+        publishEvent(
+                router.routeLocal(backend).orElse(null),
+                formatPlayer(config.getFormats().serverJoin(), player, previousBackend, backend),
+                false
+        );
+    }
+
+    public void updatePresence() {
+        updatePresence(ChatX.getProxy().getAllPlayers().size());
+    }
+
+    public void updatePresence(int online) {
+        String presence = config.getFormats().presence().replace("{online}", Integer.toString(online));
+        jda.getPresence().setActivity(Activity.customStatus(presence));
     }
 
     public boolean queueMinecraft(@Nonnull DiscordEvent event) {
@@ -135,7 +197,10 @@ public class DiscordManager {
         }
     }
 
-    public void shutdown() {
+    public void shutdown(boolean publishStop) {
+        if(publishStop && config.getEvents().stop()){
+            publishEvent(router.routeGlobal().orElse(null), config.getFormats().stop(), true);
+        }
         pendingMinecraft.clear();
         webhookClients.clear();
         jda.shutdownNow();
@@ -150,6 +215,41 @@ public class DiscordManager {
 
     private static String routeName(@Nonnull DiscordRoute route) {
         return route.type() == DiscordRoute.Type.GLOBAL ? "GLOBAL" : "LOCAL:" + route.backend();
+    }
+
+    private void publishStart() {
+        if(config.getEvents().start()){
+            publishEvent(router.routeGlobal().orElse(null), config.getFormats().start(), false);
+        }
+    }
+
+    private void publishEvent(
+            @Nullable DiscordRoute route,
+            @Nonnull String content,
+            boolean wait
+    ) {
+        if(route == null) return;
+        MessageChannel channel = jda.getChannelById(MessageChannel.class, route.effectiveDestinationId());
+        if(channel == null) return;
+        try{
+            var action = channel.sendMessage(content);
+            if(wait) action.complete();
+            else action.queue();
+        }catch (Exception e){
+            Logger.warn("Failed to publish Discord event to route " + routeName(route) + ".");
+        }
+    }
+
+    private static String formatPlayer(
+            @Nonnull String format,
+            @Nonnull Player player,
+            @Nonnull String previousBackend,
+            @Nonnull String backend
+    ) {
+        return format
+                .replace("{name}", player.getUsername())
+                .replace("{previous-server}", previousBackend)
+                .replace("{server}", backend);
     }
 
     boolean isChatXWebhook(@Nonnull String authorId) {
