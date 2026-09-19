@@ -6,6 +6,7 @@ import com.velocitypowered.api.event.connection.DisconnectEvent;
 import com.velocitypowered.api.event.connection.PostLoginEvent;
 import com.velocitypowered.api.event.player.ServerPostConnectEvent;
 import com.velocitypowered.api.proxy.Player;
+import com.velocitypowered.api.proxy.server.RegisteredServer;
 
 import javax.annotation.Nonnull;
 
@@ -24,12 +25,13 @@ public class DiscordNetworkListener {
         if(manager == null || event.getPlayer().getCurrentServer().isEmpty()) return;
 
         String backend = event.getPlayer().getCurrentServer().orElseThrow().getServerInfo().getName();
-        if(event.getPreviousServer().isEmpty()){
+        RegisteredServer previousServer = event.getPreviousServer();
+        if(previousServer == null){
             manager.publishBackendJoin(event.getPlayer(), backend);
             return;
         }
 
-        String previousBackend = event.getPreviousServer().orElseThrow().getServerInfo().getName();
+        String previousBackend = previousServer.getServerInfo().getName();
         manager.publishServerSwitch(event.getPlayer(), previousBackend, backend);
     }
 
