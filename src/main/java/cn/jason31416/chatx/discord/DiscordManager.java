@@ -1,12 +1,14 @@
 package cn.jason31416.chatx.discord;
 
 import cn.jason31416.chatx.ChatX;
+import cn.jason31416.chatx.util.Config;
 import cn.jason31416.chatx.util.Logger;
 import com.velocitypowered.api.proxy.Player;
 import lombok.AccessLevel;
 import lombok.Getter;
 import net.dv8tion.jda.api.JDABuilder;
 import net.dv8tion.jda.api.JDA;
+import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.entities.Activity;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.IncomingWebhookClient;
@@ -34,6 +36,9 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 @Getter
 public class DiscordManager {
     private static final long PENDING_MINECRAFT_TTL_MILLIS = 10_000L;
+    private static final int JOIN_COLOR = 0x57F287;
+    private static final int LEAVE_COLOR = 0xED4245;
+    private static final int SWITCH_COLOR = 0x5865F2;
 
     private final JDA jda;
     private final DiscordConfig config;
@@ -99,21 +104,41 @@ public class DiscordManager {
 
     public void publishNetworkJoin(@Nonnull Player player) {
         if(!config.getEvents().join()) return;
-        publishEvent(router.routeGlobal().orElse(null), formatPlayer(config.getFormats().join(), player, "", ""), false);
+        publishEvent(
+                router.routeGlobal().orElse(null),
+                formatPlayer(config.getFormats().join(), player, "", ""),
+                JOIN_COLOR,
+                avatarUrl(player),
+                false
+        );
     }
 
     public void publishBackendJoin(@Nonnull Player player, @Nonnull String backend) {
         if(!config.getEvents().join()) return;
-        publishEvent(router.routeLocal(backend).orElse(null), formatPlayer(config.getFormats().serverJoin(), player, "", backend), false);
+        publishEvent(
+                router.routeLocal(backend).orElse(null),
+                formatPlayer(config.getFormats().serverJoin(), player, "", backend),
+                JOIN_COLOR,
+                avatarUrl(player),
+                false
+        );
     }
 
     public void publishNetworkLeave(@Nonnull Player player, @Nullable String backend) {
         if(!config.getEvents().leave()) return;
-        publishEvent(router.routeGlobal().orElse(null), formatPlayer(config.getFormats().leave(), player, "", ""), false);
+        publishEvent(
+                router.routeGlobal().orElse(null),
+                formatPlayer(config.getFormats().leave(), player, "", ""),
+                LEAVE_COLOR,
+                avatarUrl(player),
+                false
+        );
         if(backend != null){
             publishEvent(
                     router.routeLocal(backend).orElse(null),
                     formatPlayer(config.getFormats().serverLeave(), player, backend, backend),
+                    LEAVE_COLOR,
+                    avatarUrl(player),
                     false
             );
         }
@@ -126,15 +151,19 @@ public class DiscordManager {
     ) {
         if(!config.getEvents().serverSwitch()) return;
         String message = formatPlayer(config.getFormats().serverSwitch(), player, previousBackend, backend);
-        publishEvent(router.routeGlobal().orElse(null), message, false);
+        publishEvent(router.routeGlobal().orElse(null), message, SWITCH_COLOR, avatarUrl(player), false);
         publishEvent(
                 router.routeLocal(previousBackend).orElse(null),
                 formatPlayer(config.getFormats().serverLeave(), player, previousBackend, previousBackend),
+                LEAVE_COLOR,
+                avatarUrl(player),
                 false
         );
         publishEvent(
                 router.routeLocal(backend).orElse(null),
                 formatPlayer(config.getFormats().serverJoin(), player, previousBackend, backend),
+                JOIN_COLOR,
+                avatarUrl(player),
                 false
         );
     }
@@ -199,7 +228,7 @@ public class DiscordManager {
 
     public void shutdown(boolean publishStop) {
         if(publishStop && config.getEvents().stop()){
-            publishEvent(router.routeGlobal().orElse(null), config.getFormats().stop(), true);
+            publishEvent(router.routeGlobal().orElse(null), config.getFormats().stop(), LEAVE_COLOR, null, true);
         }
         pendingMinecraft.clear();
         webhookClients.clear();
@@ -219,20 +248,26 @@ public class DiscordManager {
 
     private void publishStart() {
         if(config.getEvents().start()){
-            publishEvent(router.routeGlobal().orElse(null), config.getFormats().start(), false);
+            publishEvent(router.routeGlobal().orElse(null), config.getFormats().start(), JOIN_COLOR, null, false);
         }
     }
 
     private void publishEvent(
             @Nullable DiscordRoute route,
             @Nonnull String content,
+            int color,
+            @Nullable String thumbnailUrl,
             boolean wait
     ) {
         if(route == null) return;
         MessageChannel channel = jda.getChannelById(MessageChannel.class, route.effectiveDestinationId());
         if(channel == null) return;
         try{
-            var action = channel.sendMessage(content);
+            EmbedBuilder builder = new EmbedBuilder()
+                    .setColor(color)
+                    .setDescription(normalizeEmoji(content));
+            if(thumbnailUrl != null) builder.setThumbnail(thumbnailUrl);
+            var action = channel.sendMessageEmbeds(builder.build()).setAllowedMentions(List.of());
             if(wait) action.complete();
             else action.queue();
         }catch (Exception e){
@@ -248,8 +283,28 @@ public class DiscordManager {
     ) {
         return format
                 .replace("{name}", player.getUsername())
-                .replace("{previous-server}", previousBackend)
-                .replace("{server}", backend);
+                .replace("{previous-server}", serverDisplayName(previousBackend))
+                .replace("{server}", serverDisplayName(backend));
+    }
+
+    @Nonnull
+    private String avatarUrl(@Nonnull Player player) {
+        return config.getAvatarUrl().replace("{uuid}", player.getUniqueId().toString());
+    }
+
+    @Nonnull
+    private static String serverDisplayName(@Nonnull String backend) {
+        return backend.isBlank() ? "" : Config.getServerDisplayName(backend);
+    }
+
+    @Nonnull
+    private static String normalizeEmoji(@Nonnull String content) {
+        return content
+                .replace(":arrow_right:", "➡️")
+                .replace(":arrow_left:", "⬅️")
+                .replace(":left_right_arrow:", "↔️")
+                .replace(":white_check_mark:", "✅")
+                .replace(":octagonal_sign:", "🛑");
     }
 
     boolean isChatXWebhook(@Nonnull String authorId) {
