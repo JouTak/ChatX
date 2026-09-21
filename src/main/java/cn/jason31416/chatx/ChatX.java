@@ -6,6 +6,7 @@ import cn.jason31416.chatx.handler.PacketEventListener;
 import cn.jason31416.chatx.handler.RedisRemoteManager;
 import cn.jason31416.chatx.util.RateLimiter;
 import com.github.retrooper.packetevents.PacketEvents;
+import com.github.retrooper.packetevents.protocol.particle.type.ParticleTypes;
 import com.google.inject.Inject;
 import com.velocitypowered.api.command.CommandMeta;
 import com.velocitypowered.api.event.proxy.ProxyInitializeEvent;
@@ -23,6 +24,7 @@ import cn.jason31416.chatx.command.OnlineCommand;
 import cn.jason31416.chatx.command.ChatXCommand;
 import cn.jason31416.chatx.discord.DiscordConfig;
 import cn.jason31416.chatx.discord.DiscordManager;
+import cn.jason31416.chatx.discord.DiscordNetworkListener;
 import cn.jason31416.chatx.handler.*;
 import cn.jason31416.chatx.message.MessageLoader;
 import cn.jason31416.chatx.module.PatternModule;
@@ -42,7 +44,7 @@ import java.util.concurrent.TimeUnit;
 @Plugin(
         id = "chatx",
         name = "ChatXJT",
-        version = "1.3.6",
+        version = "1.3.10",
         authors = {
                 "EnderDissa"
         },
@@ -84,7 +86,8 @@ public class ChatX {
         proxy.getEventManager().register(this, interactiveChatBridge);
         Config.init();
         discordConfig = DiscordConfig.load(Config.getDiscordTree());
-        discordManager = DiscordManager.create(discordConfig);
+        discordManager = DiscordManager.create(discordConfig, true);
+        proxy.getEventManager().register(this, new DiscordNetworkListener());
         MessageLoader.initialize();
 
         if(Config.getConfigTree().getBoolean("redis.enabled", false)){
@@ -104,6 +107,7 @@ public class ChatX {
         PacketEvents.getAPI().getSettings().kickOnPacketException(false);
 
         PacketEvents.getAPI().load();
+        registerCustomParticleTypes();
 //        PacketEvents.getAPI().getEventManager().registerListener(new PlayerInventoryListener());
         PacketEvents.getAPI().getEventManager().registerListener(new PacketEventListener());
         PacketEvents.getAPI().getEventManager().registerListener(new ChatPacketListener());
@@ -127,11 +131,22 @@ public class ChatX {
         getProxy().getConsoleCommandSource().hasPermission("chatx.channel");
     }
 
+    private void registerCustomParticleTypes() {
+        for(String particleType : Config.getConfigTree().getStringList("packetevents.custom-particle-types")){
+            if(particleType.isBlank() || ParticleTypes.getByName(particleType) != null) continue;
+            try{
+                ParticleTypes.define(particleType);
+            }catch (RuntimeException e){
+                logger.warn("Cannot register custom particle type {}: {}", particleType, e.getMessage());
+            }
+        }
+    }
+
     public static void reload() {
         Config.reload();
         discordConfig = DiscordConfig.load(Config.getDiscordTree());
-        if(discordManager != null) discordManager.shutdown();
-        discordManager = DiscordManager.create(discordConfig);
+        if(discordManager != null) discordManager.shutdown(false);
+        discordManager = DiscordManager.create(discordConfig, false);
         MessageLoader.initialize();
 
         if(Config.getConfigTree().getBoolean("redis.enabled", false)){
@@ -164,7 +179,7 @@ public class ChatX {
     @Subscribe
     public void onProxyShutdown(@Nonnull ProxyShutdownEvent event) {
         if(RedisRemoteManager.getInstance()!=null) RedisRemoteManager.getInstance().shutdown();
-        if(discordManager != null) discordManager.shutdown();
+        if(discordManager != null) discordManager.shutdown(true);
         PacketEvents.getAPI().terminate();
     }
 }

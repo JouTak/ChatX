@@ -32,6 +32,7 @@ public class DiscordConfig {
     private final List<DiscordRoute> routes;
     private final Formats formats;
     private final Events events;
+    private final Colors colors;
     private final String avatarUrl;
     private final String defaultNicknameColor;
     private final boolean connectionValid;
@@ -45,6 +46,7 @@ public class DiscordConfig {
             List<DiscordRoute> routes,
             Formats formats,
             Events events,
+            Colors colors,
             String avatarUrl,
             String defaultNicknameColor,
             boolean connectionValid,
@@ -57,6 +59,7 @@ public class DiscordConfig {
         this.routes = List.copyOf(routes);
         this.formats = formats;
         this.events = events;
+        this.colors = colors;
         this.avatarUrl = avatarUrl;
         this.defaultNicknameColor = defaultNicknameColor;
         this.connectionValid = connectionValid;
@@ -95,11 +98,13 @@ public class DiscordConfig {
                 formatTree.getString("chat", "**{name}**: {message}"),
                 formatTree.getString("reply", "**{name}** replied to **{reply-name}**: {message}"),
                 formatTree.getString("attachments", "{url}"),
-                formatTree.getString("join", ":arrow_right: **{name}** joined the network"),
-                formatTree.getString("leave", ":arrow_left: **{name}** left the network"),
-                formatTree.getString("switch", ":left_right_arrow: **{name}** moved from {previous-server} to {server}"),
-                formatTree.getString("start", ":white_check_mark: Network started"),
-                formatTree.getString("stop", ":octagonal_sign: Network stopped"),
+                formatTree.getString("join", "{name} joined the network on {server}"),
+                formatTree.getString("leave", "{name} left the network from {server}"),
+                formatTree.getString("server-join", "{name} joined {server}"),
+                formatTree.getString("server-leave", "{name} left {server}"),
+                formatTree.getString("switch", "{name} moved from {previous-server} to {server}"),
+                formatTree.getString("start", "✅ Network started"),
+                formatTree.getString("stop", "🛑 Network stopped"),
                 formatTree.getString("presence", "{online} players online")
         );
 
@@ -111,6 +116,13 @@ public class DiscordConfig {
                 eventTree.getBoolean("start", true),
                 eventTree.getBoolean("stop", true)
         );
+
+        MapTree colorTree = tree.getSection("colors");
+        ColorParseResult joinColor = parseColor(colorTree, "join", "#57F287", enabled);
+        ColorParseResult leaveColor = parseColor(colorTree, "leave", "#ED4245", enabled);
+        ColorParseResult switchColor = parseColor(colorTree, "switch", "#5865F2", enabled);
+        Colors colors = new Colors(joinColor.color(), leaveColor.color(), switchColor.color());
+        valid &= joinColor.valid() && leaveColor.valid() && switchColor.valid();
 
         String avatarUrl = tree.getString("avatar-url", "https://mc-heads.net/avatar/{uuid}/64");
         if(enabled && !avatarUrl.contains("{uuid}")){
@@ -132,6 +144,7 @@ public class DiscordConfig {
                 routes,
                 formats,
                 events,
+                colors,
                 avatarUrl,
                 defaultNicknameColor,
                 connectionValid,
@@ -232,6 +245,20 @@ public class DiscordConfig {
         return DISCORD_ID.matcher(value).matches();
     }
 
+    private static ColorParseResult parseColor(
+            @Nonnull MapTree tree,
+            @Nonnull String key,
+            @Nonnull String fallback,
+            boolean enabled
+    ) {
+        String value = tree.getString(key, fallback).trim();
+        if(!value.matches("^#[0-9A-Fa-f]{6}$")){
+            if(enabled) Logger.error("Discord config: colors." + key + " must be a hex color.");
+            return new ColorParseResult(Integer.parseInt(fallback.substring(1), 16), !enabled);
+        }
+        return new ColorParseResult(Integer.parseInt(value.substring(1), 16), true);
+    }
+
     private static boolean isWebhookUrl(String value) {
         try{
             URI uri = URI.create(value);
@@ -254,12 +281,16 @@ public class DiscordConfig {
 
     private record RouteParseResult(List<DiscordRoute> routes, boolean valid) {}
 
+    private record ColorParseResult(int color, boolean valid) {}
+
     public record Formats(
             String chat,
             String reply,
             String attachments,
             String join,
             String leave,
+            String serverJoin,
+            String serverLeave,
             String serverSwitch,
             String start,
             String stop,
@@ -273,4 +304,6 @@ public class DiscordConfig {
             boolean start,
             boolean stop
     ) {}
+
+    public record Colors(int join, int leave, int serverSwitch) {}
 }

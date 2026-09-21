@@ -23,10 +23,37 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
 import javax.annotation.Nonnull;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class ChatPacketListener extends SimplePacketListenerAbstract {
+    private static final long BACKEND_ECHO_TTL_MILLIS = 5_000;
+    private static final Map<UUID, BackendEcho> suppressedBackendEchoes = new ConcurrentHashMap<>();
+
     public ChatPacketListener() {
         super(PacketListenerPriority.NORMAL);
+    }
+
+    public static void suppressBackendEcho(@Nonnull Player player, @Nonnull String message) {
+        suppressedBackendEchoes.put(
+                player.getUniqueId(),
+                new BackendEcho(message, System.currentTimeMillis())
+        );
+    }
+
+    public static void discardBackendEcho(@Nonnull UUID playerUuid) {
+        suppressedBackendEchoes.remove(playerUuid);
+    }
+
+    private boolean shouldSuppressBackendEcho(@Nonnull Player player, @Nonnull Component message) {
+        BackendEcho backendEcho = suppressedBackendEchoes.get(player.getUniqueId());
+        if(backendEcho == null) return false;
+        if(System.currentTimeMillis() - backendEcho.createdAt() > BACKEND_ECHO_TTL_MILLIS){
+            suppressedBackendEchoes.remove(player.getUniqueId(), backendEcho);
+            return false;
+        }
+        return PlainTextComponentSerializer.plainText().serialize(message).endsWith(backendEcho.message());
     }
     public void attemptRewriteSignedPacket(@Nonnull PacketPlaySendEvent event) {
         if(event.getPacketType() != PacketType.Play.Server.CHAT_MESSAGE){
@@ -114,6 +141,11 @@ public class ChatPacketListener extends SimplePacketListenerAbstract {
 
             // Process chat
 
+            if(shouldSuppressBackendEcho(player, message)){
+                event.setCancelled(true);
+                return;
+            }
+
             if(!player.equals(event.getPlayer())){
                 // Only process one packet of a message.
                 if(isSigned)
@@ -159,5 +191,7 @@ public class ChatPacketListener extends SimplePacketListenerAbstract {
             }
         }
     }
+
+    private record BackendEcho(@Nonnull String message, long createdAt) {}
 
 }

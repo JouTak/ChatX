@@ -51,6 +51,11 @@ module:
 
 debug: false # Do not turn on unless instructed
 
+# Custom no-data particle types supplied by modded backends. Requires proxy restart.
+packetevents:
+  custom-particle-types:
+    - "spectrum:firefly"
+
 servers:
   mod: "ITMOcraft Modex"
   # mod -> ITMOcraft Modex

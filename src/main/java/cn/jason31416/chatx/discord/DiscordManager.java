@@ -1,10 +1,15 @@
 package cn.jason31416.chatx.discord;
 
+import cn.jason31416.chatx.ChatX;
+import cn.jason31416.chatx.util.Config;
 import cn.jason31416.chatx.util.Logger;
+import com.velocitypowered.api.proxy.Player;
 import lombok.AccessLevel;
 import lombok.Getter;
 import net.dv8tion.jda.api.JDABuilder;
 import net.dv8tion.jda.api.JDA;
+import net.dv8tion.jda.api.EmbedBuilder;
+import net.dv8tion.jda.api.entities.Activity;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.IncomingWebhookClient;
 import net.dv8tion.jda.api.entities.WebhookClient;
@@ -31,9 +36,9 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 @Getter
 public class DiscordManager {
     private static final long PENDING_MINECRAFT_TTL_MILLIS = 10_000L;
-
     private final JDA jda;
     private final DiscordConfig config;
+    private final boolean lifecycleEvents;
     private volatile List<DiscordRoute> availableRoutes = List.of();
     private volatile DiscordRouter router = new DiscordRouter(List.of());
     @Getter(AccessLevel.NONE)
@@ -44,10 +49,12 @@ public class DiscordManager {
     public DiscordManager(@Nonnull JDA jda) {
         this.jda = jda;
         this.config = null;
+        this.lifecycleEvents = false;
     }
 
-    private DiscordManager(@Nonnull DiscordConfig config) {
+    private DiscordManager(@Nonnull DiscordConfig config, boolean lifecycleEvents) {
         this.config = config;
+        this.lifecycleEvents = lifecycleEvents;
         this.jda = JDABuilder.createDefault(config.getToken(), config.getIntents())
                 .addEventListeners(
                         new DiscordMessageListener(this),
@@ -55,13 +62,18 @@ public class DiscordManager {
                             @Override
                             public void onReady(@Nonnull ReadyEvent event) {
                                 validateConnection(event.getJDA());
+                                updatePresence();
+                                if(lifecycleEvents) publishStart();
                             }
                         }
                 )
                 .build();
     }
 
-    public static DiscordManager create(@Nonnull DiscordConfig config) {
+    public static DiscordManager create(
+            @Nonnull DiscordConfig config,
+            boolean lifecycleEvents
+    ) {
         if(!config.isEnabled()) return null;
         if(!config.isConnectionValid()){
             Logger.error("Discord integration is disabled because discord.yml is invalid.");
@@ -72,7 +84,7 @@ public class DiscordManager {
         }
 
         try{
-            return new DiscordManager(config);
+            return new DiscordManager(config, lifecycleEvents);
         }catch (Exception e){
             Logger.error("Failed to start Discord integration.");
             return null;
@@ -84,6 +96,81 @@ public class DiscordManager {
         if(channel == null) return false;
         channel.sendMessage(message).queue();
         return true;
+    }
+
+    public void publishNetworkJoin(@Nonnull Player player, @Nonnull String backend) {
+        if(!config.getEvents().join()) return;
+        publishEvent(
+                router.routeGlobal().orElse(null),
+                formatNetworkEvent(config.getFormats().join(), player, backend),
+                config.getColors().join(),
+                avatarUrl(player),
+                false
+        );
+    }
+
+    public void publishBackendJoin(@Nonnull Player player, @Nonnull String backend) {
+        if(!config.getEvents().join()) return;
+        publishEvent(
+                router.routeLocal(backend).orElse(null),
+                formatPlayer(config.getFormats().serverJoin(), player, "", backend),
+                config.getColors().join(),
+                avatarUrl(player),
+                false
+        );
+    }
+
+    public void publishNetworkLeave(@Nonnull Player player, @Nullable String backend) {
+        if(!config.getEvents().leave()) return;
+        publishEvent(
+                router.routeGlobal().orElse(null),
+                formatNetworkEvent(config.getFormats().leave(), player, backend == null ? "" : backend),
+                config.getColors().leave(),
+                avatarUrl(player),
+                false
+        );
+        if(backend != null){
+            publishEvent(
+                    router.routeLocal(backend).orElse(null),
+                    formatPlayer(config.getFormats().serverLeave(), player, backend, backend),
+                    config.getColors().leave(),
+                    avatarUrl(player),
+                    false
+            );
+        }
+    }
+
+    public void publishServerSwitch(
+            @Nonnull Player player,
+            @Nonnull String previousBackend,
+            @Nonnull String backend
+    ) {
+        if(!config.getEvents().serverSwitch()) return;
+        String message = formatPlayer(config.getFormats().serverSwitch(), player, previousBackend, backend);
+        publishEvent(router.routeGlobal().orElse(null), message, config.getColors().serverSwitch(), avatarUrl(player), false);
+        publishEvent(
+                router.routeLocal(previousBackend).orElse(null),
+                formatPlayer(config.getFormats().serverLeave(), player, previousBackend, previousBackend),
+                config.getColors().leave(),
+                avatarUrl(player),
+                false
+        );
+        publishEvent(
+                router.routeLocal(backend).orElse(null),
+                formatPlayer(config.getFormats().serverJoin(), player, previousBackend, backend),
+                config.getColors().join(),
+                avatarUrl(player),
+                false
+        );
+    }
+
+    public void updatePresence() {
+        updatePresence(ChatX.getProxy().getAllPlayers().size());
+    }
+
+    public void updatePresence(int online) {
+        String presence = config.getFormats().presence().replace("{online}", Integer.toString(online));
+        jda.getPresence().setActivity(Activity.customStatus(presence));
     }
 
     public boolean queueMinecraft(@Nonnull DiscordEvent event) {
@@ -135,7 +222,10 @@ public class DiscordManager {
         }
     }
 
-    public void shutdown() {
+    public void shutdown(boolean publishStop) {
+        if(publishStop && config.getEvents().stop()){
+            publishEvent(router.routeGlobal().orElse(null), config.getFormats().stop(), config.getColors().leave(), null, true);
+        }
         pendingMinecraft.clear();
         webhookClients.clear();
         jda.shutdownNow();
@@ -150,6 +240,85 @@ public class DiscordManager {
 
     private static String routeName(@Nonnull DiscordRoute route) {
         return route.type() == DiscordRoute.Type.GLOBAL ? "GLOBAL" : "LOCAL:" + route.backend();
+    }
+
+    private void publishStart() {
+        if(config.getEvents().start()){
+            publishEvent(router.routeGlobal().orElse(null), config.getFormats().start(), config.getColors().join(), null, false);
+        }
+    }
+
+    private void publishEvent(
+            @Nullable DiscordRoute route,
+            @Nonnull String content,
+            int color,
+            @Nullable String authorIconUrl,
+            boolean wait
+    ) {
+        if(route == null) return;
+        MessageChannel channel = jda.getChannelById(MessageChannel.class, route.effectiveDestinationId());
+        if(channel == null) return;
+        try{
+            EmbedBuilder builder = new EmbedBuilder().setColor(color);
+            if(authorIconUrl == null){
+                builder.setDescription(normalizeEmoji(content));
+            }else{
+                builder.setAuthor(authorText(content), null, authorIconUrl);
+            }
+            var action = channel.sendMessageEmbeds(builder.build()).setAllowedMentions(List.of());
+            if(wait) action.complete();
+            else action.queue();
+        }catch (Exception e){
+            Logger.warn("Failed to publish Discord event to route " + routeName(route) + ".");
+        }
+    }
+
+    private static String formatPlayer(
+            @Nonnull String format,
+            @Nonnull Player player,
+            @Nonnull String previousBackend,
+            @Nonnull String backend
+    ) {
+        return format
+                .replace("{name}", player.getUsername())
+                .replace("{previous-server}", serverDisplayName(previousBackend))
+                .replace("{server}", serverDisplayName(backend));
+    }
+
+    @Nonnull
+    private static String formatNetworkEvent(
+            @Nonnull String format,
+            @Nonnull Player player,
+            @Nonnull String backend
+    ) {
+        String message = formatPlayer(format, player, "", backend);
+        if(backend.isBlank() || format.contains("{server}")) return message;
+        return message + " · **" + serverDisplayName(backend) + "**";
+    }
+
+    @Nonnull
+    private String avatarUrl(@Nonnull Player player) {
+        return config.getAvatarUrl().replace("{uuid}", player.getUniqueId().toString());
+    }
+
+    @Nonnull
+    private static String serverDisplayName(@Nonnull String backend) {
+        return backend.isBlank() ? "" : Config.getServerDisplayName(backend);
+    }
+
+    @Nonnull
+    private static String normalizeEmoji(@Nonnull String content) {
+        return content
+                .replace(":arrow_right:", "➡️")
+                .replace(":arrow_left:", "⬅️")
+                .replace(":left_right_arrow:", "↔️")
+                .replace(":white_check_mark:", "✅")
+                .replace(":octagonal_sign:", "🛑");
+    }
+
+    @Nonnull
+    private static String authorText(@Nonnull String content) {
+        return normalizeEmoji(content).replace("**", "");
     }
 
     boolean isChatXWebhook(@Nonnull String authorId) {
