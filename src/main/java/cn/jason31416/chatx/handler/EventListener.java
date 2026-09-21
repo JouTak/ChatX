@@ -31,7 +31,7 @@ public class EventListener {
         long timemuted = PunishmentHandler.fetchMuted(new SimplePlayer(event.getPlayer()));
         if(timemuted!=-1){
             event.getPlayer().sendMessage(Message.getMessage("chat.player-is-muted").add("time_left", TimeUtil.displayMillis(timemuted-System.currentTimeMillis())).toComponent());
-            event.setResult(PlayerChatEvent.ChatResult.denied());
+            cancelChat(event);
             return;
         }
 
@@ -53,19 +53,20 @@ public class EventListener {
         String serverid = event.getPlayer().getCurrentServer().get().getServerInfo().getName();
 
         if (channel.getRestrictedServers().contains(serverid)) {
-            event.setResult(PlayerChatEvent.ChatResult.denied());
+            cancelChat(event);
             event.getPlayer().sendMessage(Message.getMessage("chat.channel-declined").toComponent());
             return;
         }
 
         if(channel.getConfig(serverid).getSendPermission()!=null&&!event.getPlayer().hasPermission(channel.getConfig(serverid).getSendPermission())){
             event.getPlayer().sendMessage(Message.getMessage("chat.no-send-permission").toComponent());
-            event.setResult(PlayerChatEvent.ChatResult.denied());
+            cancelChat(event);
             return;
         }
 
         if(channel.getConfig(event.getPlayer()).getRateLimiter()!=null&&!channel.getConfig(event.getPlayer()).getRateLimiter().invoke(event.getPlayer().getUsername())){
             event.getPlayer().sendMessage(Message.getMessage("chat.rate-limited").toComponent());
+            cancelChat(event);
             return;
         }
 
@@ -79,7 +80,7 @@ public class EventListener {
             ChatX.getProxy().getScheduler().buildTask(ChatX.getInstance(), () ->
                     Channel.handleChat(event.getPlayer(), selectedChannel, message, discordEvent)
             ).schedule();
-            event.setResult(PlayerChatEvent.ChatResult.denied());
+            cancelChat(event);
             return;
         }
 
@@ -106,12 +107,20 @@ public class EventListener {
             ChatX.getProxy().getScheduler().buildTask(ChatX.getInstance(), ()->{
                 Channel.handleChat(event.getPlayer(), channel, message, discordEvent);
             }).schedule();
-            event.setResult(PlayerChatEvent.ChatResult.denied());
+            cancelChat(event);
             return;
         }else{
             throw new ShitMountainException("Theres only fking four types of handlemodes.");
         }
 
+    }
+
+    private void cancelChat(@Nonnull PlayerChatEvent event) {
+        if(event.getPlayer().getProtocolVersion().compareTo(ProtocolVersion.MINECRAFT_1_19_1) >= 0){
+            ChatPacketListener.suppressBackendEcho(event.getPlayer(), event.getMessage());
+            return;
+        }
+        event.setResult(PlayerChatEvent.ChatResult.denied());
     }
 
     private void queueDiscordEvent(
@@ -132,6 +141,7 @@ public class EventListener {
 
     @Subscribe
     public void onPlayerLeave(@Nonnull DisconnectEvent event){
+        ChatPacketListener.discardBackendEcho(event.getPlayer().getUniqueId());
         if(ChatX.getDiscordManager() != null){
             ChatX.getDiscordManager().discardMinecraft(event.getPlayer().getUniqueId());
         }
