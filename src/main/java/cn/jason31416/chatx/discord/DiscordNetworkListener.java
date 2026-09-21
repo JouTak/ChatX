@@ -15,7 +15,6 @@ public class DiscordNetworkListener {
     public void onPostLogin(@Nonnull PostLoginEvent event) {
         DiscordManager manager = ChatX.getDiscordManager();
         if(manager == null) return;
-        manager.publishNetworkJoin(event.getPlayer());
         manager.updatePresence(onlineAfterJoin(event.getPlayer()));
     }
 
@@ -27,6 +26,7 @@ public class DiscordNetworkListener {
         String backend = event.getPlayer().getCurrentServer().orElseThrow().getServerInfo().getName();
         RegisteredServer previousServer = event.getPreviousServer();
         if(previousServer == null){
+            manager.publishNetworkJoin(event.getPlayer(), backend);
             manager.publishBackendJoin(event.getPlayer(), backend);
             return;
         }

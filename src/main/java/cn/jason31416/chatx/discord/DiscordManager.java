@@ -102,11 +102,11 @@ public class DiscordManager {
         return true;
     }
 
-    public void publishNetworkJoin(@Nonnull Player player) {
+    public void publishNetworkJoin(@Nonnull Player player, @Nonnull String backend) {
         if(!config.getEvents().join()) return;
         publishEvent(
                 router.routeGlobal().orElse(null),
-                formatPlayer(config.getFormats().join(), player, "", ""),
+                formatNetworkEvent(config.getFormats().join(), player, backend),
                 JOIN_COLOR,
                 avatarUrl(player),
                 false
@@ -128,7 +128,7 @@ public class DiscordManager {
         if(!config.getEvents().leave()) return;
         publishEvent(
                 router.routeGlobal().orElse(null),
-                formatPlayer(config.getFormats().leave(), player, "", ""),
+                formatNetworkEvent(config.getFormats().leave(), player, backend == null ? "" : backend),
                 LEAVE_COLOR,
                 avatarUrl(player),
                 false
@@ -285,6 +285,17 @@ public class DiscordManager {
                 .replace("{name}", player.getUsername())
                 .replace("{previous-server}", serverDisplayName(previousBackend))
                 .replace("{server}", serverDisplayName(backend));
+    }
+
+    @Nonnull
+    private static String formatNetworkEvent(
+            @Nonnull String format,
+            @Nonnull Player player,
+            @Nonnull String backend
+    ) {
+        String message = formatPlayer(format, player, "", backend);
+        if(backend.isBlank() || format.contains("{server}")) return message;
+        return message + " · **" + serverDisplayName(backend) + "**";
     }
 
     @Nonnull
