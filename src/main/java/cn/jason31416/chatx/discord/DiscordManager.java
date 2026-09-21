@@ -36,10 +36,6 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 @Getter
 public class DiscordManager {
     private static final long PENDING_MINECRAFT_TTL_MILLIS = 10_000L;
-    private static final int JOIN_COLOR = 0x57F287;
-    private static final int LEAVE_COLOR = 0xED4245;
-    private static final int SWITCH_COLOR = 0x5865F2;
-
     private final JDA jda;
     private final DiscordConfig config;
     private final boolean lifecycleEvents;
@@ -107,7 +103,7 @@ public class DiscordManager {
         publishEvent(
                 router.routeGlobal().orElse(null),
                 formatNetworkEvent(config.getFormats().join(), player, backend),
-                JOIN_COLOR,
+                config.getColors().join(),
                 avatarUrl(player),
                 false
         );
@@ -118,7 +114,7 @@ public class DiscordManager {
         publishEvent(
                 router.routeLocal(backend).orElse(null),
                 formatPlayer(config.getFormats().serverJoin(), player, "", backend),
-                JOIN_COLOR,
+                config.getColors().join(),
                 avatarUrl(player),
                 false
         );
@@ -129,7 +125,7 @@ public class DiscordManager {
         publishEvent(
                 router.routeGlobal().orElse(null),
                 formatNetworkEvent(config.getFormats().leave(), player, backend == null ? "" : backend),
-                LEAVE_COLOR,
+                config.getColors().leave(),
                 avatarUrl(player),
                 false
         );
@@ -137,7 +133,7 @@ public class DiscordManager {
             publishEvent(
                     router.routeLocal(backend).orElse(null),
                     formatPlayer(config.getFormats().serverLeave(), player, backend, backend),
-                    LEAVE_COLOR,
+                    config.getColors().leave(),
                     avatarUrl(player),
                     false
             );
@@ -151,18 +147,18 @@ public class DiscordManager {
     ) {
         if(!config.getEvents().serverSwitch()) return;
         String message = formatPlayer(config.getFormats().serverSwitch(), player, previousBackend, backend);
-        publishEvent(router.routeGlobal().orElse(null), message, SWITCH_COLOR, avatarUrl(player), false);
+        publishEvent(router.routeGlobal().orElse(null), message, config.getColors().serverSwitch(), avatarUrl(player), false);
         publishEvent(
                 router.routeLocal(previousBackend).orElse(null),
                 formatPlayer(config.getFormats().serverLeave(), player, previousBackend, previousBackend),
-                LEAVE_COLOR,
+                config.getColors().leave(),
                 avatarUrl(player),
                 false
         );
         publishEvent(
                 router.routeLocal(backend).orElse(null),
                 formatPlayer(config.getFormats().serverJoin(), player, previousBackend, backend),
-                JOIN_COLOR,
+                config.getColors().join(),
                 avatarUrl(player),
                 false
         );
@@ -228,7 +224,7 @@ public class DiscordManager {
 
     public void shutdown(boolean publishStop) {
         if(publishStop && config.getEvents().stop()){
-            publishEvent(router.routeGlobal().orElse(null), config.getFormats().stop(), LEAVE_COLOR, null, true);
+            publishEvent(router.routeGlobal().orElse(null), config.getFormats().stop(), config.getColors().leave(), null, true);
         }
         pendingMinecraft.clear();
         webhookClients.clear();
@@ -248,7 +244,7 @@ public class DiscordManager {
 
     private void publishStart() {
         if(config.getEvents().start()){
-            publishEvent(router.routeGlobal().orElse(null), config.getFormats().start(), JOIN_COLOR, null, false);
+            publishEvent(router.routeGlobal().orElse(null), config.getFormats().start(), config.getColors().join(), null, false);
         }
     }
 
@@ -256,17 +252,19 @@ public class DiscordManager {
             @Nullable DiscordRoute route,
             @Nonnull String content,
             int color,
-            @Nullable String thumbnailUrl,
+            @Nullable String authorIconUrl,
             boolean wait
     ) {
         if(route == null) return;
         MessageChannel channel = jda.getChannelById(MessageChannel.class, route.effectiveDestinationId());
         if(channel == null) return;
         try{
-            EmbedBuilder builder = new EmbedBuilder()
-                    .setColor(color)
-                    .setDescription(normalizeEmoji(content));
-            if(thumbnailUrl != null) builder.setThumbnail(thumbnailUrl);
+            EmbedBuilder builder = new EmbedBuilder().setColor(color);
+            if(authorIconUrl == null){
+                builder.setDescription(normalizeEmoji(content));
+            }else{
+                builder.setAuthor(authorText(content), null, authorIconUrl);
+            }
             var action = channel.sendMessageEmbeds(builder.build()).setAllowedMentions(List.of());
             if(wait) action.complete();
             else action.queue();
@@ -316,6 +314,11 @@ public class DiscordManager {
                 .replace(":left_right_arrow:", "↔️")
                 .replace(":white_check_mark:", "✅")
                 .replace(":octagonal_sign:", "🛑");
+    }
+
+    @Nonnull
+    private static String authorText(@Nonnull String content) {
+        return normalizeEmoji(content).replace("**", "");
     }
 
     boolean isChatXWebhook(@Nonnull String authorId) {
