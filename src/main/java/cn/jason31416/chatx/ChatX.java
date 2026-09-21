@@ -6,6 +6,7 @@ import cn.jason31416.chatx.handler.PacketEventListener;
 import cn.jason31416.chatx.handler.RedisRemoteManager;
 import cn.jason31416.chatx.util.RateLimiter;
 import com.github.retrooper.packetevents.PacketEvents;
+import com.github.retrooper.packetevents.protocol.particle.type.ParticleTypes;
 import com.google.inject.Inject;
 import com.velocitypowered.api.command.CommandMeta;
 import com.velocitypowered.api.event.proxy.ProxyInitializeEvent;
@@ -43,7 +44,7 @@ import java.util.concurrent.TimeUnit;
 @Plugin(
         id = "chatx",
         name = "ChatXJT",
-        version = "1.3.7",
+        version = "1.3.9",
         authors = {
                 "EnderDissa"
         },
@@ -106,6 +107,7 @@ public class ChatX {
         PacketEvents.getAPI().getSettings().kickOnPacketException(false);
 
         PacketEvents.getAPI().load();
+        registerCustomParticleTypes();
 //        PacketEvents.getAPI().getEventManager().registerListener(new PlayerInventoryListener());
         PacketEvents.getAPI().getEventManager().registerListener(new PacketEventListener());
         PacketEvents.getAPI().getEventManager().registerListener(new ChatPacketListener());
@@ -127,6 +129,17 @@ public class ChatX {
         getProxy().getConsoleCommandSource().hasPermission("chatx.chathistory");
         getProxy().getConsoleCommandSource().hasPermission("chatx.admin");
         getProxy().getConsoleCommandSource().hasPermission("chatx.channel");
+    }
+
+    private void registerCustomParticleTypes() {
+        for(String particleType : Config.getConfigTree().getStringList("packetevents.custom-particle-types")){
+            if(particleType.isBlank() || ParticleTypes.getByName(particleType) != null) continue;
+            try{
+                ParticleTypes.define(particleType);
+            }catch (RuntimeException e){
+                logger.warn("Cannot register custom particle type {}: {}", particleType, e.getMessage());
+            }
+        }
     }
 
     public static void reload() {
