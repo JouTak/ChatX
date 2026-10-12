@@ -50,18 +50,8 @@ public class Config {
             Logger.error("Failed to load channel.yml: " + e.getMessage());
         }
 
-        File discord = new File(ChatX.getDataDirectory(), "discord.yml");
-        if(!discord.exists()){
-            try (InputStream is = ChatX.class.getClassLoader().getResourceAsStream("discord.yml"); OutputStream os = new FileOutputStream(discord)) {
-                Objects.requireNonNull(is).transferTo(os);
-            }catch (Exception e){
-                Logger.error("Cannot save discord.yml file!");
-                throw new RuntimeException(e);
-            }
-        }
-
         try {
-            discordTree = loadDiscordTree(discord);
+            discordTree = loadDiscordCandidate();
         }catch (Exception e){
             Logger.error("Failed to load discord.yml: " + e.getMessage());
             discordTree = new MapTree();
@@ -133,21 +123,25 @@ public class Config {
             throw new RuntimeException(e);
         }
 
+    }
+
+    /**
+     * Reads discord.yml without changing the currently active Discord config.
+     * The caller must validate the returned tree before installing it.
+     */
+    public static MapTree loadDiscordCandidate() throws IOException {
+        if(!ChatX.getDataDirectory().exists()) ChatX.getDataDirectory().mkdirs();
         File discord = new File(ChatX.getDataDirectory(), "discord.yml");
         if(!discord.exists()){
             try (InputStream is = ChatX.class.getClassLoader().getResourceAsStream("discord.yml"); OutputStream os = new FileOutputStream(discord)) {
                 Objects.requireNonNull(is).transferTo(os);
-            } catch(Exception e) {
-                throw new RuntimeException(e);
             }
         }
+        return loadDiscordTree(discord);
+    }
 
-        try {
-            discordTree = loadDiscordTree(discord);
-        }catch (Exception e){
-            Logger.error("Failed to load discord.yml: " + e.getMessage());
-            discordTree = new MapTree();
-        }
+    public static void installDiscordTree(MapTree tree) {
+        discordTree = Objects.requireNonNull(tree);
     }
 
     @SuppressWarnings("unchecked")

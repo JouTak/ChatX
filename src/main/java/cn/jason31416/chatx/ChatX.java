@@ -29,6 +29,7 @@ import cn.jason31416.chatx.handler.*;
 import cn.jason31416.chatx.message.MessageLoader;
 import cn.jason31416.chatx.module.PatternModule;
 import cn.jason31416.chatx.util.Config;
+import cn.jason31416.chatx.util.MapTree;
 import cn.jason31416.chatx.util.PlaceholderUtil;
 import io.github.retrooper.packetevents.velocity.factory.VelocityPacketEventsBuilder;
 import lombok.Getter;
@@ -40,6 +41,7 @@ import java.nio.file.Path;
 import java.util.HashSet;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 
 @Plugin(
         id = "chatx",
@@ -66,9 +68,12 @@ public class ChatX {
     @Getter
     private static InteractiveChatBridge interactiveChatBridge;
     @Getter
-    private static DiscordConfig discordConfig;
+    private static volatile DiscordConfig discordConfig;
     @Getter
-    private static DiscordManager discordManager;
+    private static volatile DiscordManager discordManager;
+    private static volatile DiscordManager pendingDiscordManager;
+    private static final Object DISCORD_LOCK = new Object();
+    private static final AtomicLong DISCORD_GENERATION = new AtomicLong();
 
     @Inject
     public ChatX(@Nonnull ProxyServer proxy, @Nonnull Logger logger, @Nonnull @DataDirectory Path dataDirectory) {
@@ -85,8 +90,7 @@ public class ChatX {
         interactiveChatBridge = new InteractiveChatBridge();
         proxy.getEventManager().register(this, interactiveChatBridge);
         Config.init();
-        discordConfig = DiscordConfig.load(Config.getDiscordTree());
-        discordManager = DiscordManager.create(discordConfig, true);
+        stageDiscordConfig(Config.getDiscordTree(), DiscordConfig.load(Config.getDiscordTree()), true);
         proxy.getEventManager().register(this, new DiscordNetworkListener());
         MessageLoader.initialize();
 
@@ -143,10 +147,21 @@ public class ChatX {
     }
 
     public static void reload() {
+        MapTree candidateTree = null;
+        DiscordConfig candidateConfig = null;
+        try{
+            candidateTree = Config.loadDiscordCandidate();
+            candidateConfig = DiscordConfig.load(candidateTree);
+        }catch (Exception e){
+            logger.error("Discord reload rejected: cannot read discord.yml: {}", e.getMessage());
+            DISCORD_GENERATION.incrementAndGet();
+            cancelPendingDiscordCandidate();
+        }
+
         Config.reload();
-        discordConfig = DiscordConfig.load(Config.getDiscordTree());
-        if(discordManager != null) discordManager.shutdown(false);
-        discordManager = DiscordManager.create(discordConfig, false);
+        if(candidateTree != null && candidateConfig != null){
+            stageDiscordConfig(candidateTree, candidateConfig, false);
+        }
         MessageLoader.initialize();
 
         if(Config.getConfigTree().getBoolean("redis.enabled", false)){
@@ -178,8 +193,95 @@ public class ChatX {
 
     @Subscribe
     public void onProxyShutdown(@Nonnull ProxyShutdownEvent event) {
+        DISCORD_GENERATION.incrementAndGet();
         if(RedisRemoteManager.getInstance()!=null) RedisRemoteManager.getInstance().shutdown();
-        if(discordManager != null) discordManager.shutdown(true);
+        DiscordManager pending;
+        DiscordManager active;
+        synchronized (DISCORD_LOCK){
+            pending = pendingDiscordManager;
+            active = discordManager;
+            pendingDiscordManager = null;
+            discordManager = null;
+        }
+        if(pending != null) pending.shutdown(false);
+        if(active != null) active.shutdown(true);
         PacketEvents.getAPI().terminate();
+    }
+
+    private static void stageDiscordConfig(
+            @Nonnull MapTree candidateTree,
+            @Nonnull DiscordConfig candidateConfig,
+            boolean lifecycleEvents
+    ) {
+        long generation = DISCORD_GENERATION.incrementAndGet();
+        cancelPendingDiscordCandidate();
+        if(!candidateConfig.isEnabled()){
+            installDiscordManager(generation, candidateTree, candidateConfig, null);
+            return;
+        }
+        if(!candidateConfig.isConnectionValid() || !candidateConfig.isValid()){
+            logger.error("Discord reload rejected: discord.yml is invalid; the current connection remains active.");
+            return;
+        }
+
+        getProxy().getScheduler().buildTask(getInstance(), () -> {
+            DiscordManager started = DiscordManager.start(
+                    candidateConfig,
+                    lifecycleEvents,
+                    candidate -> installDiscordManager(generation, candidateTree, candidateConfig, candidate),
+                    error -> {
+                        if(DISCORD_GENERATION.get() != generation) return;
+                        logger.error("Discord reload rejected: {}; the current connection remains active.", errorMessage(error));
+                    }
+            );
+            if(started == null || started.isClosed()) return;
+            synchronized (DISCORD_LOCK){
+                if(DISCORD_GENERATION.get() != generation){
+                    started.shutdown(false);
+                }else if(discordManager != started){
+                    pendingDiscordManager = started;
+                }
+            }
+        }).schedule();
+    }
+
+    private static void installDiscordManager(
+            long generation,
+            @Nonnull MapTree candidateTree,
+            @Nonnull DiscordConfig candidateConfig,
+            DiscordManager candidate
+    ) {
+        DiscordManager previous;
+        synchronized (DISCORD_LOCK){
+            if(DISCORD_GENERATION.get() != generation){
+                if(candidate != null) candidate.shutdown(false);
+                return;
+            }
+            previous = discordManager;
+            if(pendingDiscordManager == candidate) pendingDiscordManager = null;
+            discordManager = candidate;
+            discordConfig = candidateConfig;
+            Config.installDiscordTree(candidateTree);
+            if(previous != null) previous.shutdown(false);
+            if(candidate != null) candidate.activate();
+        }
+        logger.info(candidate == null ? "Discord integration disabled." : "Discord integration is ready.");
+    }
+
+    @Nonnull
+    private static String errorMessage(@Nonnull Throwable error) {
+        Throwable cause = error;
+        while(cause.getCause() != null && cause != cause.getCause()) cause = cause.getCause();
+        String message = cause.getMessage();
+        return message == null || message.isBlank() ? cause.getClass().getSimpleName() : message;
+    }
+
+    private static void cancelPendingDiscordCandidate() {
+        DiscordManager candidate;
+        synchronized (DISCORD_LOCK){
+            candidate = pendingDiscordManager;
+            pendingDiscordManager = null;
+        }
+        if(candidate != null) candidate.shutdown(false);
     }
 }

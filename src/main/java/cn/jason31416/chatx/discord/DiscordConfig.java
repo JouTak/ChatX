@@ -35,6 +35,7 @@ public class DiscordConfig {
     private final Colors colors;
     private final String avatarUrl;
     private final String defaultNicknameColor;
+    private final Delivery delivery;
     private final boolean connectionValid;
     private final boolean valid;
 
@@ -49,6 +50,7 @@ public class DiscordConfig {
             Colors colors,
             String avatarUrl,
             String defaultNicknameColor,
+            Delivery delivery,
             boolean connectionValid,
             boolean valid
     ) {
@@ -62,6 +64,7 @@ public class DiscordConfig {
         this.colors = colors;
         this.avatarUrl = avatarUrl;
         this.defaultNicknameColor = defaultNicknameColor;
+        this.delivery = delivery;
         this.connectionValid = connectionValid;
         this.valid = valid;
     }
@@ -136,6 +139,17 @@ public class DiscordConfig {
             valid = false;
         }
 
+        MapTree deliveryTree = tree.getSection("delivery");
+        IntParseResult queueCapacity = parsePositiveInt(deliveryTree, "queue-capacity", 256, enabled);
+        IntParseResult maxInFlight = parsePositiveInt(deliveryTree, "max-in-flight", 16, enabled);
+        IntParseResult errorLogInterval = parsePositiveInt(deliveryTree, "error-log-interval-seconds", 60, enabled);
+        Delivery delivery = new Delivery(
+                queueCapacity.value(),
+                maxInFlight.value(),
+                errorLogInterval.value()
+        );
+        valid &= queueCapacity.valid() && maxInFlight.valid() && errorLogInterval.valid();
+
         return new DiscordConfig(
                 enabled,
                 token,
@@ -147,6 +161,7 @@ public class DiscordConfig {
                 colors,
                 avatarUrl,
                 defaultNicknameColor,
+                delivery,
                 connectionValid,
                 valid
         );
@@ -279,9 +294,25 @@ public class DiscordConfig {
                 || host.endsWith(".discordapp.com");
     }
 
+    private static IntParseResult parsePositiveInt(
+            @Nonnull MapTree tree,
+            @Nonnull String key,
+            int fallback,
+            boolean enabled
+    ) {
+        int value = tree.getInt(key, fallback);
+        if(value <= 0){
+            if(enabled) Logger.error("Discord config: delivery." + key + " must be greater than zero.");
+            return new IntParseResult(fallback, !enabled);
+        }
+        return new IntParseResult(value, true);
+    }
+
     private record RouteParseResult(List<DiscordRoute> routes, boolean valid) {}
 
     private record ColorParseResult(int color, boolean valid) {}
+
+    private record IntParseResult(int value, boolean valid) {}
 
     public record Formats(
             String chat,
@@ -306,4 +337,6 @@ public class DiscordConfig {
     ) {}
 
     public record Colors(int join, int leave, int serverSwitch) {}
+
+    public record Delivery(int queueCapacity, int maxInFlight, int errorLogIntervalSeconds) {}
 }

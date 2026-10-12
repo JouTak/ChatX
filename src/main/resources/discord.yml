@@ -36,6 +36,12 @@ colors:
 avatar-url: "https://mc-heads.net/avatar/{uuid}/64"
 default-nickname-color: "#47BFFB"
 
+# Outbound Discord work is isolated from Minecraft chat by a bounded queue.
+delivery:
+  queue-capacity: 256
+  max-in-flight: 16
+  error-log-interval-seconds: 60
+
 events:
   join: true
   leave: true
