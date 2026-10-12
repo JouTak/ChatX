@@ -22,9 +22,11 @@ public class DiscordMessageListener extends ListenerAdapter {
     private static final TextColor DISCORD_COLOR = TextColor.color(0x5865F2);
 
     private final DiscordManager manager;
+    private final DiscordPlayerListCommand playerListCommand;
 
     public DiscordMessageListener(@Nonnull DiscordManager manager) {
         this.manager = manager;
+        this.playerListCommand = new DiscordPlayerListCommand(manager);
     }
 
     @Override
@@ -35,6 +37,7 @@ public class DiscordMessageListener extends ListenerAdapter {
 
         DiscordRoute route = manager.getRouter().routeDiscord(event.getChannel().getId()).orElse(null);
         if(route == null) return;
+        if(playerListCommand.consume(event, route)) return;
         if(event.getAuthor().getIdLong() == event.getJDA().getSelfUser().getIdLong()) return;
         if(event.isWebhookMessage() && manager.isChatXWebhook(event.getAuthor().getId())) return;
         if(config.isIgnoreBots() && event.getAuthor().isBot()) return;

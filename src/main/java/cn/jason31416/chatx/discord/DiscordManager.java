@@ -12,6 +12,7 @@ import net.dv8tion.jda.api.JDABuilder;
 import net.dv8tion.jda.api.entities.Activity;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.IncomingWebhookClient;
+import net.dv8tion.jda.api.entities.Message;
 import net.dv8tion.jda.api.entities.WebhookClient;
 import net.dv8tion.jda.api.entities.channel.concrete.ThreadChannel;
 import net.dv8tion.jda.api.entities.channel.middleman.GuildChannel;
@@ -207,6 +208,26 @@ public class DiscordManager {
         });
     }
 
+    public boolean publishCommandResponse(
+            @Nonnull String destinationId,
+            @Nonnull String content,
+            int deleteAfterSeconds
+    ) {
+        return dispatch("player-list-command:" + destinationId, (success, failure) -> {
+            MessageChannel channel = jda.getChannelById(MessageChannel.class, destinationId);
+            if(channel == null) throw new DeliveryException("destination channel is unavailable");
+            channel.sendMessage(MessageCreateData.fromContent(content))
+                    .setAllowedMentions(List.of())
+                    .queue(
+                            sent -> {
+                                success.run();
+                                scheduleCommandResponseDeletion(sent, deleteAfterSeconds);
+                            },
+                            failure
+                    );
+        });
+    }
+
     public void publishNetworkJoin(@Nonnull Player player, @Nonnull String backend) {
         if(!config.getEvents().join()) return;
         publishEvent(router.routeGlobal().orElse(null), formatNetworkEvent(config.getFormats().join(), player, backend), config.getColors().join(), avatarUrl(player));
@@ -355,6 +376,18 @@ public class DiscordManager {
         }catch (Throwable error){
             reportFailure("shutdown-event", "Failed to prepare Discord stop event", error);
             return false;
+        }
+    }
+
+    private void scheduleCommandResponseDeletion(@Nonnull Message message, int delaySeconds) {
+        if(delaySeconds <= 0 || closed.get()) return;
+        try{
+            jda.getRateLimitPool().schedule(() -> dispatch(
+                    "player-list-command-delete:" + message.getChannel().getId(),
+                    (success, failure) -> message.delete().queue(ignored -> success.run(), failure)
+            ), delaySeconds, TimeUnit.SECONDS);
+        }catch (RejectedExecutionException ignored){
+            // The manager is shutting down, so no delayed work should survive it.
         }
     }
 
