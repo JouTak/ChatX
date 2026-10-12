@@ -36,6 +36,7 @@ public class DiscordConfig {
     private final String avatarUrl;
     private final String defaultNicknameColor;
     private final Delivery delivery;
+    private final PlayerListCommand playerListCommand;
     private final boolean connectionValid;
     private final boolean valid;
 
@@ -51,6 +52,7 @@ public class DiscordConfig {
             String avatarUrl,
             String defaultNicknameColor,
             Delivery delivery,
+            PlayerListCommand playerListCommand,
             boolean connectionValid,
             boolean valid
     ) {
@@ -65,6 +67,7 @@ public class DiscordConfig {
         this.avatarUrl = avatarUrl;
         this.defaultNicknameColor = defaultNicknameColor;
         this.delivery = delivery;
+        this.playerListCommand = playerListCommand;
         this.connectionValid = connectionValid;
         this.valid = valid;
     }
@@ -150,6 +153,55 @@ public class DiscordConfig {
         );
         valid &= queueCapacity.valid() && maxInFlight.valid() && errorLogInterval.valid();
 
+        MapTree commandTree = tree.getSection("player-list-command");
+        boolean commandEnabled = commandTree.getBoolean("enabled", true);
+        String commandTrigger = commandTree.getString("trigger", "пинг");
+        int cooldownSeconds = commandTree.getInt("cooldown-seconds", 1);
+        int deleteAfterSeconds = commandTree.getInt("delete-after-seconds", 30);
+        boolean validateCommand = enabled && commandEnabled;
+        if(validateCommand && commandTrigger.isBlank()){
+            Logger.error("Discord config: player-list-command.trigger cannot be empty.");
+            valid = false;
+        }
+        if(validateCommand && cooldownSeconds < 0){
+            Logger.error("Discord config: player-list-command.cooldown-seconds cannot be negative.");
+            valid = false;
+        }
+        if(validateCommand && deleteAfterSeconds < 0){
+            Logger.error("Discord config: player-list-command.delete-after-seconds cannot be negative.");
+            valid = false;
+        }
+        MapTree commandFormatsTree = commandTree.getSection("formats");
+        PlayerListFormats playerListFormats = new PlayerListFormats(
+                commandFormatsTree.getString("header", "**Игроки онлайн: {count}**"),
+                commandFormatsTree.getString("player", "- {name}"),
+                commandFormatsTree.getString("empty", "Сейчас никто не играет."),
+                commandFormatsTree.getString("truncated", "… и ещё {hidden}")
+        );
+        if(validateCommand && !playerListFormats.header().contains("{count}")){
+            Logger.error("Discord config: player-list-command.formats.header must contain {count}.");
+            valid = false;
+        }
+        if(validateCommand && !playerListFormats.player().contains("{name}")){
+            Logger.error("Discord config: player-list-command.formats.player must contain {name}.");
+            valid = false;
+        }
+        if(validateCommand && playerListFormats.empty().isBlank()){
+            Logger.error("Discord config: player-list-command.formats.empty cannot be empty.");
+            valid = false;
+        }
+        if(validateCommand && !playerListFormats.truncated().contains("{hidden}")){
+            Logger.error("Discord config: player-list-command.formats.truncated must contain {hidden}.");
+            valid = false;
+        }
+        PlayerListCommand playerListCommand = new PlayerListCommand(
+                commandEnabled,
+                commandTrigger,
+                Math.max(0, cooldownSeconds),
+                Math.max(0, deleteAfterSeconds),
+                playerListFormats
+        );
+
         return new DiscordConfig(
                 enabled,
                 token,
@@ -162,6 +214,7 @@ public class DiscordConfig {
                 avatarUrl,
                 defaultNicknameColor,
                 delivery,
+                playerListCommand,
                 connectionValid,
                 valid
         );
@@ -339,4 +392,14 @@ public class DiscordConfig {
     public record Colors(int join, int leave, int serverSwitch) {}
 
     public record Delivery(int queueCapacity, int maxInFlight, int errorLogIntervalSeconds) {}
+
+    public record PlayerListCommand(
+            boolean enabled,
+            String trigger,
+            int cooldownSeconds,
+            int deleteAfterSeconds,
+            PlayerListFormats formats
+    ) {}
+
+    public record PlayerListFormats(String header, String player, String empty, String truncated) {}
 }

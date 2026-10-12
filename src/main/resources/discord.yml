@@ -42,6 +42,20 @@ delivery:
   max-in-flight: 16
   error-log-interval-seconds: 60
 
+player-list-command:
+  enabled: true
+  trigger: "пинг"
+  # Applied independently to the invoking user and the destination channel.
+  cooldown-seconds: 1
+  # Set to 0 to keep responses.
+  delete-after-seconds: 30
+  formats:
+    # Available placeholders: {count}, plus {name} for player and {hidden} for truncated.
+    header: "**Игроки онлайн: {count}**"
+    player: "- {name}"
+    empty: "Сейчас никто не играет."
+    truncated: "… и ещё {hidden}"
+
 events:
   join: true
   leave: true
