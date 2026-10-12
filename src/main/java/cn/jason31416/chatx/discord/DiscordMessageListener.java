@@ -29,6 +29,7 @@ public class DiscordMessageListener extends ListenerAdapter {
 
     @Override
     public void onMessageReceived(@Nonnull MessageReceivedEvent event) {
+        if(!manager.isActive()) return;
         DiscordConfig config = manager.getConfig();
         if(!event.isFromGuild() || !event.getGuild().getId().equals(config.getGuildId())) return;
 
