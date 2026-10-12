@@ -46,7 +46,7 @@ player-list-command:
   enabled: true
   trigger: "пинг"
   # Applied independently to the invoking user and the destination channel.
-  cooldown-seconds: 10
+  cooldown-seconds: 1
   # Set to 0 to keep responses.
   delete-after-seconds: 30
   formats:

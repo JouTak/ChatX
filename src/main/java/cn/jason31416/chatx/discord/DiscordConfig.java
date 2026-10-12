@@ -156,7 +156,7 @@ public class DiscordConfig {
         MapTree commandTree = tree.getSection("player-list-command");
         boolean commandEnabled = commandTree.getBoolean("enabled", true);
         String commandTrigger = commandTree.getString("trigger", "пинг");
-        int cooldownSeconds = commandTree.getInt("cooldown-seconds", 10);
+        int cooldownSeconds = commandTree.getInt("cooldown-seconds", 1);
         int deleteAfterSeconds = commandTree.getInt("delete-after-seconds", 30);
         boolean validateCommand = enabled && commandEnabled;
         if(validateCommand && commandTrigger.isBlank()){

@@ -59,6 +59,8 @@ final class DiscordPlayerListCommand {
     ) {
         if(cooldownSeconds <= 0) return true;
         long now = System.currentTimeMillis();
+        userCooldowns.values().removeIf(expiresAt -> expiresAt <= now);
+        channelCooldowns.values().removeIf(expiresAt -> expiresAt <= now);
         if(userCooldowns.getOrDefault(userId, 0L) > now
                 || channelCooldowns.getOrDefault(channelId, 0L) > now){
             return false;
