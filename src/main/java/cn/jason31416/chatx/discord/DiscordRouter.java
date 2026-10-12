@@ -32,8 +32,16 @@ public class DiscordRouter {
     }
 
     public Optional<DiscordRoute> routeMinecraft(@Nonnull DiscordEvent event) {
-        if(event.type() == DiscordRoute.Type.GLOBAL) return Optional.ofNullable(globalRoute);
-        return Optional.ofNullable(localRoutes.get(normalizeBackend(event.backend())));
+        if(event.type() == DiscordRoute.Type.GLOBAL) return routeGlobal();
+        return routeLocal(event.backend());
+    }
+
+    public Optional<DiscordRoute> routeGlobal() {
+        return Optional.ofNullable(globalRoute);
+    }
+
+    public Optional<DiscordRoute> routeLocal(@Nonnull String backend) {
+        return Optional.ofNullable(localRoutes.get(normalizeBackend(backend)));
     }
 
     public Optional<DiscordRoute> routeDiscord(@Nonnull String destinationId) {

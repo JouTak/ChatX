@@ -92,7 +92,11 @@ public class Config {
     }
 
     public static String getServerDisplayName(String serverName) {
-        return configTree.getString("servers." + serverName, serverName);
+        MapTree servers = configTree.getSection("servers");
+        for(String key : servers.getKeys()){
+            if(key.equalsIgnoreCase(serverName)) return servers.getString(key, serverName);
+        }
+        return serverName;
     }
 
     @SuppressWarnings("ResultOfMethodCallIgnored")

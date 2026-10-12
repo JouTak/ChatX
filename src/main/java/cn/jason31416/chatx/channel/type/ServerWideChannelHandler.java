@@ -68,10 +68,10 @@ public abstract class ServerWideChannelHandler implements ChannelHandler {
                         if (InteractiveChatHook.containsPlaceholder(message)) {
                             ChatX.getInteractiveChatBridge().process(player.getPlayer(), receiver.getPlayer(), component, processed -> {
                                 Component marked = InteractiveChatBridge.markProcessed(processed);
-                                receiver.getPlayer().sendMessage(marked, ChatType.CHAT.bind(marked));
+                                sendMessage(receiver, marked);
                             });
                         } else {
-                            receiver.getPlayer().sendMessage(component, ChatType.CHAT.bind(component));
+                            sendMessage(receiver, component);
                         }
                     }
                     DiscordManager discordManager = ChatX.getDiscordManager();
@@ -101,15 +101,23 @@ public abstract class ServerWideChannelHandler implements ChannelHandler {
                 if (InteractiveChatHook.containsPlaceholder(PlainTextComponentSerializer.plainText().serialize(component))) {
                     ChatX.getInteractiveChatBridge().process(player.getPlayer(), receiver.getPlayer(), message, processed -> {
                         Component marked = InteractiveChatBridge.markProcessed(processed);
-                        receiver.getPlayer().sendMessage(marked, ChatType.CHAT.bind(marked));
+                        sendMessage(receiver, marked);
                     });
                 } else {
-                    receiver.getPlayer().sendMessage(message, ChatType.CHAT.bind(message));
+                    sendMessage(receiver, message);
                 }
             }
             if(getChannel().getConfig(player.getCurrentServer()).isLogToConsole()) {
                 ChatX.getProxy().getConsoleCommandSource().sendMessage(message);
             }
         });
+    }
+
+    private void sendMessage(@Nonnull SimplePlayer receiver, @Nonnull Component message) {
+        if("GLOBAL".equalsIgnoreCase(getChannel().getType())){
+            receiver.getPlayer().sendMessage(message);
+            return;
+        }
+        receiver.getPlayer().sendMessage(message, ChatType.CHAT.bind(message));
     }
 }

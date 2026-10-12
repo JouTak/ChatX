@@ -41,7 +41,9 @@ public class DiscordMessageListener extends ListenerAdapter {
         Component message = render(event, config);
         if(message == null) return;
         ChatX.getProxy().getScheduler().buildTask(ChatX.getInstance(), () ->
-                getReceivers(route).forEach(player -> player.sendMessage(message))
+                getReceivers(route).stream()
+                        .filter(player -> player.getCurrentServer().isPresent())
+                        .forEach(player -> player.sendMessage(message))
         ).schedule();
     }
 
