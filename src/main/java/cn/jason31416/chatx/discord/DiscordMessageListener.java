@@ -29,6 +29,10 @@ public class DiscordMessageListener extends ListenerAdapter {
         this.playerListCommand = new DiscordPlayerListCommand(manager);
     }
 
+    void shutdown() {
+        playerListCommand.shutdown();
+    }
+
     @Override
     public void onMessageReceived(@Nonnull MessageReceivedEvent event) {
         if(!manager.isActive()) return;

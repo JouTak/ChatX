@@ -28,6 +28,7 @@ import net.dv8tion.jda.api.exceptions.RateLimitedException;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import net.dv8tion.jda.api.requests.ErrorResponse;
 import net.dv8tion.jda.api.utils.messages.MessageCreateData;
+import net.dv8tion.jda.api.utils.FileUpload;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import okhttp3.OkHttpClient;
@@ -150,6 +151,7 @@ public class DiscordManager {
                     .build();
         }catch (RuntimeException error){
             deliveryExecutor.shutdownNow();
+            messageListener.shutdown();
             throw error;
         }
         try{
@@ -225,6 +227,35 @@ public class DiscordManager {
                             },
                             failure
                     );
+        });
+    }
+
+    public boolean publishCommandImageResponse(
+            @Nonnull String destinationId,
+            @Nonnull byte[] png,
+            @Nonnull String fallback,
+            int deleteAfterSeconds
+    ) {
+        return dispatch("player-list-image:" + destinationId, (success, failure) -> {
+            MessageChannel channel = jda.getChannelById(MessageChannel.class, destinationId);
+            if(channel == null) throw new DeliveryException("destination channel is unavailable");
+            try{
+                channel.sendFiles(FileUpload.fromData(png, "tab.png"))
+                        .setAllowedMentions(List.of())
+                        .queue(
+                                sent -> {
+                                    success.run();
+                                    scheduleCommandResponseDeletion(sent, deleteAfterSeconds);
+                                },
+                                error -> {
+                                    failure.accept(error);
+                                    publishCommandResponse(destinationId, fallback, deleteAfterSeconds);
+                                }
+                        );
+            }catch (RuntimeException error){
+                publishCommandResponse(destinationId, fallback, deleteAfterSeconds);
+                throw error;
+            }
         });
     }
 
@@ -316,6 +347,7 @@ public class DiscordManager {
     public void shutdown(boolean publishStop) {
         if(!closed.compareAndSet(false, true)) return;
         active.set(false);
+        messageListener.shutdown();
         pendingMinecraft.clear();
         deliveryExecutor.shutdownNow();
         if(publishStop && config.getEvents().stop() && queueStopAndClose()){
@@ -527,6 +559,7 @@ public class DiscordManager {
 
     private void closeResources() {
         if(!resourcesClosed.compareAndSet(false, true)) return;
+        messageListener.shutdown();
         webhookClients.clear();
         unavailableWebhooks.clear();
         lastErrorLogs.clear();

@@ -158,6 +158,42 @@ public class DiscordConfig {
         String commandTrigger = commandTree.getString("trigger", "пинг");
         int cooldownSeconds = commandTree.getInt("cooldown-seconds", 1);
         int deleteAfterSeconds = commandTree.getInt("delete-after-seconds", 30);
+        MapTree imageTree = commandTree.getSection("image");
+        String imageMode = imageTree.getString("mode", "image").toLowerCase(Locale.ROOT);
+        int imageMaxPlayers = imageTree.getInt("max-players", 80);
+        int renderQueueCapacity = imageTree.getInt("render-queue-capacity", 8);
+        int renderTimeoutSeconds = imageTree.getInt("render-timeout-seconds", 8);
+        if(enabled && commandEnabled && !Set.of("text", "image").contains(imageMode)){
+            Logger.error("Discord config: player-list-command.image.mode must be text or image.");
+            valid = false;
+        }
+        if(enabled && commandEnabled && (imageMaxPlayers < 1 || imageMaxPlayers > 80)){
+            Logger.error("Discord config: player-list-command.image.max-players must be between 1 and 80.");
+            valid = false;
+        }
+        if(enabled && commandEnabled && (renderQueueCapacity < 1 || renderQueueCapacity > 64)){
+            Logger.error("Discord config: player-list-command.image.render-queue-capacity must be between 1 and 64.");
+            valid = false;
+        }
+        if(enabled && commandEnabled && (renderTimeoutSeconds < 1 || renderTimeoutSeconds > 60)){
+            Logger.error("Discord config: player-list-command.image.render-timeout-seconds must be between 1 and 60.");
+            valid = false;
+        }
+        PlayerListImage image = new PlayerListImage(
+                imageMode,
+                Math.clamp(imageMaxPlayers, 1, 80),
+                imageTree.getBoolean("show-heads", true),
+                imageTree.getBoolean("show-ping", true),
+                imageTree.getBoolean("use-tab", true),
+                imageTree.getString("network-name", "JouTak"),
+                imageTree.getString("header", "&b{route_name} &7• &f{count} онлайн"),
+                imageTree.getString("footer", "&7Показано {shown} из {count} &8• &7В сети {network_online}"),
+                imageTree.getString("name-format", "{prefix}{display_name}{suffix}"),
+                imageTree.getString("ping-format", "{ping} ms"),
+                imageTree.getString("text-fallback", ""),
+                Math.clamp(renderQueueCapacity, 1, 64),
+                Math.clamp(renderTimeoutSeconds, 1, 60)
+        );
         boolean validateCommand = enabled && commandEnabled;
         if(validateCommand && commandTrigger.isBlank()){
             Logger.error("Discord config: player-list-command.trigger cannot be empty.");
@@ -199,7 +235,8 @@ public class DiscordConfig {
                 commandTrigger,
                 Math.max(0, cooldownSeconds),
                 Math.max(0, deleteAfterSeconds),
-                playerListFormats
+                playerListFormats,
+                image
         );
 
         return new DiscordConfig(
@@ -398,8 +435,25 @@ public class DiscordConfig {
             String trigger,
             int cooldownSeconds,
             int deleteAfterSeconds,
-            PlayerListFormats formats
+            PlayerListFormats formats,
+            PlayerListImage image
     ) {}
 
     public record PlayerListFormats(String header, String player, String empty, String truncated) {}
+
+    public record PlayerListImage(
+            String mode,
+            int maxPlayers,
+            boolean showHeads,
+            boolean showPing,
+            boolean useTab,
+            String networkName,
+            String header,
+            String footer,
+            String nameFormat,
+            String pingFormat,
+            String textFallback,
+            int renderQueueCapacity,
+            int renderTimeoutSeconds
+    ) {}
 }

@@ -16,11 +16,13 @@ final class DiscordPlayerListCommand {
     private static final int MAX_MESSAGE_LENGTH = Message.MAX_CONTENT_LENGTH;
 
     private final DiscordManager manager;
+    private final DiscordTabImageService images;
     private final Map<String, Long> userCooldowns = new HashMap<>();
     private final Map<String, Long> channelCooldowns = new HashMap<>();
 
     DiscordPlayerListCommand(@Nonnull DiscordManager manager) {
         this.manager = manager;
+        this.images = new DiscordTabImageService(manager);
     }
 
     boolean consume(@Nonnull MessageReceivedEvent event, @Nonnull DiscordRoute route) {
@@ -33,14 +35,22 @@ final class DiscordPlayerListCommand {
             return true;
         }
 
-        List<String> players = players(route);
-        String response = render(players, command.formats());
-        manager.publishCommandResponse(event.getChannel().getId(), response, command.deleteAfterSeconds());
+        if("image".equals(command.image().mode())){
+            images.submit(route, event.getChannel().getId());
+        }else{
+            List<String> players = players(route);
+            String response = render(players, command.formats());
+            manager.publishCommandResponse(event.getChannel().getId(), response, command.deleteAfterSeconds());
+        }
         return true;
     }
 
+    void shutdown() {
+        images.shutdown();
+    }
+
     @Nonnull
-    private static List<String> players(@Nonnull DiscordRoute route) {
+    static List<String> players(@Nonnull DiscordRoute route) {
         var stream = route.type() == DiscordRoute.Type.GLOBAL
                 ? ChatX.getProxy().getAllPlayers().stream()
                 : ChatX.getProxy().getServer(route.backend())
@@ -72,7 +82,7 @@ final class DiscordPlayerListCommand {
     }
 
     @Nonnull
-    private static String render(
+    static String render(
             @Nonnull List<String> players,
             @Nonnull DiscordConfig.PlayerListFormats formats
     ) {
