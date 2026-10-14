@@ -159,7 +159,7 @@ public class DiscordConfig {
         int cooldownSeconds = commandTree.getInt("cooldown-seconds", 1);
         int deleteAfterSeconds = commandTree.getInt("delete-after-seconds", 30);
         MapTree imageTree = commandTree.getSection("image");
-        String imageMode = imageTree.getString("mode", "image").toLowerCase(Locale.ROOT);
+        String imageMode = imageTree.getString("mode", "text").toLowerCase(Locale.ROOT);
         int imageMaxPlayers = imageTree.getInt("max-players", 80);
         int renderQueueCapacity = imageTree.getInt("render-queue-capacity", 8);
         int renderTimeoutSeconds = imageTree.getInt("render-timeout-seconds", 8);

@@ -57,7 +57,7 @@ player-list-command:
     truncated: "… и ещё {hidden}"
   image:
     # text keeps the original command output; image renders a Minecraft-style TAB.
-    mode: image
+    mode: text
     max-players: 80
     show-heads: true
     show-ping: true

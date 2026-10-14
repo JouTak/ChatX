@@ -46,7 +46,7 @@ import java.util.concurrent.atomic.AtomicLong;
 @Plugin(
         id = "chatx",
         name = "ChatXJT",
-        version = "1.3.10",
+        version = "1.4.0",
         authors = {
                 "EnderDissa"
         },
