@@ -232,31 +232,62 @@ public class DiscordManager {
 
     public boolean publishCommandImageResponse(
             @Nonnull String destinationId,
-            @Nonnull byte[] png,
+            @Nonnull List<byte[]> pngPages,
             @Nonnull String fallback,
             int deleteAfterSeconds
     ) {
         return dispatch("player-list-image:" + destinationId, (success, failure) -> {
             MessageChannel channel = jda.getChannelById(MessageChannel.class, destinationId);
             if(channel == null) throw new DeliveryException("destination channel is unavailable");
+            if(pngPages.isEmpty()) throw new DeliveryException("TAB renderer produced no images");
+            sendCommandImagePage(channel, destinationId, pngPages, 0, new ArrayList<>(),
+                    fallback, deleteAfterSeconds, success, failure);
+        });
+    }
+
+    private void sendCommandImagePage(MessageChannel channel, String destinationId, List<byte[]> pngPages,
+                                      int index, List<Message> sentPages, String fallback, int deleteAfterSeconds,
+                                      Runnable success, Consumer<Throwable> failure) {
+        FileUpload upload = null;
+        try{
+            upload = FileUpload.fromData(pngPages.get(index), "tab-" + (index + 1) + ".png");
+            channel.sendFiles(upload).setAllowedMentions(List.of()).queue(
+                    sent -> {
+                        sentPages.add(sent);
+                        if(index + 1 < pngPages.size()){
+                            sendCommandImagePage(channel, destinationId, pngPages, index + 1, sentPages,
+                                    fallback, deleteAfterSeconds, success, failure);
+                        }else{
+                            success.run();
+                            sentPages.forEach(page -> scheduleCommandResponseDeletion(page, deleteAfterSeconds));
+                        }
+                    },
+                    error -> failCommandImagePages(destinationId, sentPages, fallback,
+                            deleteAfterSeconds, error, failure)
+            );
+        }catch (RuntimeException error){
+            if(upload != null){
+                try{
+                    upload.close();
+                }catch (IOException ignored){
+                    // Preserve the delivery failure that caused cleanup.
+                }
+            }
+            failCommandImagePages(destinationId, sentPages, fallback, deleteAfterSeconds, error, failure);
+        }
+    }
+
+    private void failCommandImagePages(String destinationId, List<Message> sentPages, String fallback,
+                                       int deleteAfterSeconds, Throwable error, Consumer<Throwable> failure) {
+        sentPages.forEach(page -> {
             try{
-                channel.sendFiles(FileUpload.fromData(png, "tab.png"))
-                        .setAllowedMentions(List.of())
-                        .queue(
-                                sent -> {
-                                    success.run();
-                                    scheduleCommandResponseDeletion(sent, deleteAfterSeconds);
-                                },
-                                error -> {
-                                    failure.accept(error);
-                                    publishCommandResponse(destinationId, fallback, deleteAfterSeconds);
-                                }
-                        );
-            }catch (RuntimeException error){
-                publishCommandResponse(destinationId, fallback, deleteAfterSeconds);
-                throw error;
+                page.delete().queue(ignored -> {}, ignored -> {});
+            }catch (RuntimeException ignored){
+                // A failed cleanup must not suppress the text fallback.
             }
         });
+        failure.accept(error);
+        publishCommandResponse(destinationId, fallback, deleteAfterSeconds);
     }
 
     public void publishNetworkJoin(@Nonnull Player player, @Nonnull String backend) {

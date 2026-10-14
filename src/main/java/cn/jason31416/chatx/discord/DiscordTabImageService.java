@@ -3,6 +3,7 @@ package cn.jason31416.chatx.discord;
 import cn.jason31416.chatx.ChatX;
 
 import javax.annotation.Nonnull;
+import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
@@ -43,10 +44,10 @@ final class DiscordTabImageService {
                     captured.set(snapshot);
                     String response = fallback(snapshot, command, route);
                     if(renderer == null) renderer = new DiscordTabImageRenderer();
-                    byte[] image = renderer.render(snapshot, config, deadline);
+                    List<byte[]> images = renderer.render(snapshot, config, deadline);
                     if(System.currentTimeMillis() >= deadline) throw new IllegalStateException("TAB render timed out");
                     if(responded.compareAndSet(false, true)){
-                        if(!manager.publishCommandImageResponse(destinationId, image, response,
+                        if(!manager.publishCommandImageResponse(destinationId, images, response,
                                 command.deleteAfterSeconds())){
                             manager.publishCommandResponse(destinationId, response, command.deleteAfterSeconds());
                         }

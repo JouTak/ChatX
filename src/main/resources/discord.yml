@@ -63,8 +63,8 @@ player-list-command:
     show-ping: true
     use-tab: true
     network-name: "JouTak"
-    # Both {key} and %key% forms are accepted. Header/footer: route_name, route,
-    # backend, server_id, server, count, online, server_online, network_online,
+    # Both {key} and %key% forms are accepted. Header/footer: network_name,
+    # route_name, route, backend, server_id, server, count, online, server_online, network_online,
     # shown, hidden, max and online_<backend-id> for every Velocity server.
     # Row fields additionally: name/player/player_name, display_name/tab_name/tabname,
     # prefix/tabprefix, suffix/tabsuffix, group, sort_key, ping/player_ping,
@@ -72,9 +72,12 @@ player-list-command:
     # World/group/TAB styling
     # need TAB on Velocity; world needs TAB Bridge on the backend.
     # Arbitrary TAB/PAPI placeholders and viewer-specific layouts are not read.
-    header: "&b{route_name} &7• &f{count} онлайн"
-    footer: "&7Показано {shown} из {count} &8• &7В сети {network_online}"
+    header: "&b{network_name} &7• &f{network_online} в сети"
+    # Shown for LOCAL routes. The GLOBAL footer appears only when the list is truncated.
+    footer: "&7{route_name}: показано {shown} из {count}"
+    global-footer: "&7Показано {shown} из {count}"
     name-format: "{prefix}{display_name}{suffix}"
+    local-name-format: "{prefix}{display_name}"
     ping-format: "{ping} ms"
     # Empty = use the text list from formats above if image delivery fails.
     text-fallback: ""

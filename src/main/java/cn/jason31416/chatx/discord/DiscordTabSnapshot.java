@@ -17,6 +17,8 @@ import java.util.regex.Pattern;
 record DiscordTabSnapshot(
         @Nonnull String routeName,
         @Nonnull String backend,
+        @Nonnull String networkName,
+        boolean local,
         int count,
         int networkOnline,
         int hidden,
@@ -74,7 +76,7 @@ record DiscordTabSnapshot(
         int shown = Math.min(count, config.maxPlayers());
         String backend = route.type() == DiscordRoute.Type.GLOBAL ? "" : route.backend();
         String routeName = backend.isBlank() ? config.networkName() : Config.getServerDisplayName(backend);
-        return new DiscordTabSnapshot(routeName, backend, count,
+        return new DiscordTabSnapshot(routeName, backend, config.networkName(), route.type() == DiscordRoute.Type.LOCAL, count,
                 ChatX.getProxy().getPlayerCount(), count - shown, config.maxPlayers(),
                 List.copyOf(entries.subList(0, shown)));
     }
@@ -83,6 +85,7 @@ record DiscordTabSnapshot(
         Map<String, String> values = new HashMap<>();
         values.put("route_name", routeName);
         values.put("route", routeName);
+        values.put("network_name", networkName);
         values.put("backend", backend);
         values.put("server_id", backend);
         values.put("server", routeName);
@@ -151,19 +154,24 @@ record DiscordTabSnapshot(
             values.put("server", server);
             values.put("server_id", backend);
             values.put("server_online", Integer.toString(serverOnline));
-            values.put("prefix", resolvedTab(prefix, originalPrefix, values));
-            values.put("display_name", resolvedTab(displayName, originalName, values));
+            values.put("prefix", resolvedTab(prefix, originalPrefix));
+            values.put("display_name", resolvedTab(displayName, originalName));
             values.put("tab_name", values.get("display_name"));
             values.put("tabname", values.get("display_name"));
-            values.put("suffix", resolvedTab(suffix, originalSuffix, values));
+            values.put("suffix", resolvedTab(suffix, originalSuffix));
             values.put("tabprefix", values.get("prefix"));
             values.put("tabsuffix", values.get("suffix"));
             return values;
         }
 
-        private static String resolvedTab(String value, String original, Map<String, String> placeholders) {
-            String resolved = apply(value, placeholders);
-            return UNRESOLVED_TAB.matcher(resolved).find() ? original : resolved;
+        private static String resolvedTab(String value, String original) {
+            if(value == null) return "";
+            // TAB's original-replaced value has already passed through its own
+            // placeholders and replacements. Do not reinterpret %world% as a
+            // literal world name here: it may be a color in TAB's config.
+            if(!UNRESOLVED_TAB.matcher(value).find()) return value;
+            String source = original != null && !original.isBlank() ? original : value;
+            return UNRESOLVED_TAB.matcher(source).replaceAll("");
         }
     }
 }

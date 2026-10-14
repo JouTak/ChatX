@@ -29,23 +29,28 @@ final class DiscordTabIntegration {
         String originalName = name;
         String originalSuffix = "";
         if(format != null){
-            originalPrefix = format.getOriginalReplacedPrefix(tabPlayer);
-            originalName = format.getOriginalReplacedName(tabPlayer);
-            originalSuffix = format.getOriginalReplacedSuffix(tabPlayer);
+            originalPrefix = value(format.getOriginalReplacedPrefix(tabPlayer));
+            originalName = value(format.getOriginalReplacedName(tabPlayer));
+            if(originalName.isBlank()) originalName = name;
+            originalSuffix = value(format.getOriginalReplacedSuffix(tabPlayer));
             prefix = applied(format.getCustomPrefix(tabPlayer), originalPrefix);
             name = applied(format.getCustomName(tabPlayer), originalName);
             suffix = applied(format.getCustomSuffix(tabPlayer), originalSuffix);
         }
         String sortKey = "";
         if(sorting != null){
-            sortKey = applied(sorting.getForcedTeamName(tabPlayer), sorting.getOriginalTeamName(tabPlayer));
+            sortKey = value(applied(sorting.getForcedTeamName(tabPlayer), sorting.getOriginalTeamName(tabPlayer)));
         }
-        return new DiscordTabValues(prefix, name, suffix, tabPlayer.getGroup(), sortKey, tabPlayer.getWorld(),
+        return new DiscordTabValues(prefix, name, suffix, value(tabPlayer.getGroup()), sortKey, value(tabPlayer.getWorld()),
                 originalPrefix, originalName, originalSuffix);
     }
 
     private static String applied(String custom, String original) {
         return custom == null ? original : custom;
+    }
+
+    private static String value(String value) {
+        return value == null ? "" : value;
     }
 
 }
