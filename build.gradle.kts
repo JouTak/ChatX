@@ -38,6 +38,7 @@ dependencies {
     implementation("org.xerial:sqlite-jdbc:3.53.1.0")
     implementation("com.mysql:mysql-connector-j:9.7.0")
     compileOnly("com.velocitypowered:velocity-api:3.5.0-SNAPSHOT")
+    compileOnly("com.github.NEZNAMY:TAB-API:6.1.2")
     compileOnly("net.skinsrestorer:skinsrestorer-api:15.9.3")
     compileOnly("io.github.miniplaceholders:miniplaceholders-api:3.1.0")
     compileOnly("net.william278:papiproxybridge:1.8.4")
@@ -47,7 +48,7 @@ dependencies {
 }
 
 group = "cn.jason31416"
-version = "1.3.10"
+version = "1.4.0"
 description = "ChatXJT"
 java.sourceCompatibility = JavaVersion.VERSION_21
 var baseName: String = "ChatX-Beta"
