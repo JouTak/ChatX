@@ -22,12 +22,19 @@ import java.util.UUID;
 import java.util.regex.Pattern;
 
 final class DiscordTabImageRenderer {
-    private static final int FONT_SIZE = 28;
-    private static final int ROW_HEIGHT = 46;
-    private static final int PADDING = 24;
-    private static final int MIN_COLUMN_WIDTH = 760;
+    private static final int FONT_SIZE = 20;
+    private static final int LINE_HEIGHT = 27;
+    private static final int ROW_HEIGHT = 32;
+    private static final int ROW_GAP = 2;
+    private static final int PADDING = 7;
+    private static final int SECTION_GAP = 4;
+    private static final int MIN_COLUMN_WIDTH = 260;
     private static final int ROWS_PER_COLUMN = 20;
-    private static final int HEAD_SIZE = 30;
+    private static final int HEAD_SIZE = 24;
+    private static final int PING_WIDTH = 20;
+    private static final int PING_HEIGHT = 16;
+    private static final int ROW_PADDING = 7;
+    private static final int NAME_PING_GAP = 8;
     private static final int MAX_HEAD_BYTES = 128_000;
     private static final long HEAD_TTL = 60L * 60L * 1000L;
     private static final long FAILED_HEAD_TTL = 5L * 60L * 1000L;
@@ -36,6 +43,7 @@ final class DiscordTabImageRenderer {
 
     private final Font[] primaryFonts = new Font[4];
     private final Font[] fallbackFonts = new Font[4];
+    private final BufferedImage[] pingIcons = new BufferedImage[6];
     private final Map<UUID, CachedHead> heads = new HashMap<>();
 
     DiscordTabImageRenderer() throws IOException {
@@ -49,6 +57,10 @@ final class DiscordTabImageRenderer {
             }
         }catch (java.awt.FontFormatException error){
             throw new IOException("Minecraft Seven font cannot be loaded", error);
+        }
+        pingIcons[0] = loadPingIcon("ping_unknown");
+        for(int strength = 1; strength <= 5; strength++){
+            pingIcons[strength] = loadPingIcon("ping_" + strength);
         }
     }
 
@@ -75,9 +87,11 @@ final class DiscordTabImageRenderer {
                 nameWidth = Math.max(nameWidth, styledWidth(metrics, row.name()));
                 pingWidth = Math.max(pingWidth, styledWidth(metrics, row.pingText()));
             }
-            int left = 16 + (config.showHeads() ? HEAD_SIZE + 10 : 0);
-            int right = config.showPing() ? Math.max(96, pingWidth) + 54 : 16;
-            columnWidth = Math.max(MIN_COLUMN_WIDTH, left + nameWidth + right + 16);
+            int left = ROW_PADDING + (config.showHeads() ? HEAD_SIZE + 5 : 0);
+            int right = config.showPing()
+                    ? pingWidth + PING_WIDTH + ROW_PADDING + 5 + NAME_PING_GAP
+                    : ROW_PADDING;
+            columnWidth = Math.max(MIN_COLUMN_WIDTH, left + nameWidth + right);
         }finally{
             metrics.dispose();
         }
@@ -107,10 +121,13 @@ final class DiscordTabImageRenderer {
                 : List.of("&7Продолжение " + (page + 1) + "/" + pages);
         String footerTemplate = snapshot.local() ? config.footer()
                 : snapshot.hidden() > 0 ? config.globalFooter() : "";
-        List<String> footer = page == pages - 1
-                ? lines(DiscordTabSnapshot.apply(footerTemplate, snapshot.placeholders())) : List.of();
-        int headerHeight = Math.max(64, header.size() * 38 + 18);
-        int footerHeight = footer.isEmpty() ? 0 : Math.max(56, footer.size() * 38 + 14);
+        List<String> footer = new ArrayList<>();
+        if(page == pages - 1){
+            footer.addAll(lines(DiscordTabSnapshot.apply(footerTemplate, snapshot.placeholders())));
+        }
+        footer.add(DiscordTabSnapshot.apply("&7{generated_at} • {source}", snapshot.placeholders()));
+        int headerHeight = header.isEmpty() ? 0 : header.size() * LINE_HEIGHT + 6;
+        int footerHeight = footer.isEmpty() ? 0 : footer.size() * LINE_HEIGHT + 6;
         BufferedImage probe = new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB);
         Graphics2D metrics = probe.createGraphics();
         int textWidth = 0;
@@ -121,22 +138,22 @@ final class DiscordTabImageRenderer {
             metrics.dispose();
         }
         int width = Math.max(columnWidth + PADDING * 2, textWidth + PADDING * 4);
-        int height = PADDING * 2 + headerHeight + rowCount * ROW_HEIGHT + footerHeight;
+        int bodyHeight = rowCount * ROW_HEIGHT - ROW_GAP;
+        int height = PADDING * 2 + headerHeight + bodyHeight + footerHeight
+                + (headerHeight > 0 ? SECTION_GAP : 0) + (footerHeight > 0 ? SECTION_GAP : 0);
         BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
         Graphics2D g = image.createGraphics();
         try{
             g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
             g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
             g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
-            g.setColor(new Color(10, 10, 10, 226));
-            g.fillRect(0, 0, width, height);
-            g.setColor(new Color(110, 110, 110, 225));
-            g.drawRect(0, 0, width - 1, height - 1);
-            g.setColor(new Color(40, 40, 40, 170));
-            g.fillRect(PADDING, PADDING, width - PADDING * 2, headerHeight - 4);
-            drawCenteredLines(g, header, PADDING + 42, width);
+            if(headerHeight > 0){
+                g.setColor(new Color(72, 72, 72, 232));
+                g.fillRect(PADDING, PADDING, width - PADDING * 2, headerHeight);
+                drawCenteredLines(g, header, PADDING + FONT_SIZE + 3, width);
+            }
 
-            int bodyTop = PADDING + headerHeight;
+            int bodyTop = PADDING + headerHeight + (headerHeight > 0 ? SECTION_GAP : 0);
             int bodyLeft = (width - columnWidth) / 2;
             for(int index = 0; index < players.size(); index++){
                 if(Thread.currentThread().isInterrupted() || System.currentTimeMillis() >= deadlineMillis){
@@ -144,24 +161,30 @@ final class DiscordTabImageRenderer {
                 }
                 int x = bodyLeft;
                 int y = bodyTop + index * ROW_HEIGHT;
-                g.setColor(new Color(255, 255, 255, index % 2 == 0 ? 25 : 15));
-                g.fillRect(x, y, columnWidth - 4, ROW_HEIGHT - 2);
+                g.setColor(new Color(54, 54, 54, 232));
+                g.fillRect(x, y, columnWidth, ROW_HEIGHT - ROW_GAP);
                 Row entry = players.get(index);
-                int nameX = x + 16;
+                int nameX = x + ROW_PADDING;
                 if(config.showHeads()){
-                    drawHead(g, entry.uuid(), x + 12, y + 8, deadlineMillis);
-                    nameX += HEAD_SIZE + 10;
+                    drawHead(g, entry.uuid(), x + ROW_PADDING, y + 3, deadlineMillis);
+                    nameX += HEAD_SIZE + 5;
                 }
-                drawStyled(g, entry.name(), nameX, y + 33);
+                drawStyled(g, entry.name(), nameX, y + 23);
                 if(config.showPing()){
                     int pingWidth = styledWidth(g, entry.pingText());
-                    int pingX = x + columnWidth - 52 - pingWidth;
-                    drawStyled(g, entry.pingText(), pingX, y + 33);
-                    drawPingBars(g, entry.ping(), x + columnWidth - 33, y + 10);
+                    int iconX = x + columnWidth - ROW_PADDING - PING_WIDTH;
+                    int pingX = iconX - 5 - pingWidth;
+                    drawStyled(g, entry.pingText(), pingX, y + 23);
+                    drawPingIcon(g, entry.ping(), iconX, y + 7);
                 }
             }
-            if(players.isEmpty()) drawCenteredLines(g, List.of("Никого нет в сети"), bodyTop + 33, width);
-            if(!footer.isEmpty()) drawCenteredLines(g, footer, bodyTop + rowCount * ROW_HEIGHT + 40, width);
+            if(players.isEmpty()) drawCenteredLines(g, List.of("Никого нет в сети"), bodyTop + 23, width);
+            if(!footer.isEmpty()){
+                int footerTop = bodyTop + bodyHeight + SECTION_GAP;
+                g.setColor(new Color(72, 72, 72, 232));
+                g.fillRect(PADDING, footerTop, width - PADDING * 2, footerHeight);
+                drawCenteredLines(g, footer, footerTop + FONT_SIZE + 3, width);
+            }
         }finally{
             g.dispose();
         }
@@ -215,16 +238,22 @@ final class DiscordTabImageRenderer {
     private void drawCenteredLines(Graphics2D g, List<String> lines, int firstBaseline, int width) {
         for(int i = 0; i < lines.size(); i++){
             String line = lines.get(i);
-            drawStyled(g, line, (width - styledWidth(g, line)) / 2, firstBaseline + i * 38);
+            drawStyled(g, line, (width - styledWidth(g, line)) / 2, firstBaseline + i * LINE_HEIGHT);
         }
     }
 
-    private static void drawPingBars(Graphics2D g, long ping, int x, int y) {
-        int bars = ping < 0 ? 0 : ping < 150 ? 5 : ping < 300 ? 4 : ping < 600 ? 3 : ping < 1_000 ? 2 : 1;
-        for(int i = 0; i < 5; i++){
-            g.setColor(i < bars ? new Color(112, 221, 102) : new Color(78, 78, 78));
-            g.fillRect(x + i * 4, y + 23 - i * 4, 3, 5 + i * 4);
+    private BufferedImage loadPingIcon(String name) throws IOException {
+        try(InputStream input = DiscordTabImageRenderer.class.getResourceAsStream("/textures/gui/sprites/icon/" + name + ".png")){
+            if(input == null) throw new IOException("Minecraft " + name + " texture is missing");
+            BufferedImage image = ImageIO.read(input);
+            if(image == null) throw new IOException("Minecraft " + name + " texture cannot be loaded");
+            return image;
         }
+    }
+
+    private void drawPingIcon(Graphics2D g, long ping, int x, int y) {
+        int strength = ping < 0 ? 0 : ping < 150 ? 5 : ping < 300 ? 4 : ping < 600 ? 3 : ping < 1_000 ? 2 : 1;
+        g.drawImage(pingIcons[strength], x, y, PING_WIDTH, PING_HEIGHT, null);
     }
 
     private static List<String> lines(String text) {

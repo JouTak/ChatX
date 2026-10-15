@@ -5,6 +5,8 @@ import cn.jason31416.chatx.util.Config;
 import com.velocitypowered.api.proxy.Player;
 
 import javax.annotation.Nonnull;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -23,13 +25,17 @@ record DiscordTabSnapshot(
         int networkOnline,
         int hidden,
         int maxPlayers,
+        @Nonnull String generatedAt,
+        @Nonnull String source,
         @Nonnull List<Entry> players
 ) {
     private static final Pattern PLACEHOLDER = Pattern.compile("\\{([a-zA-Z0-9_]+)}|%([a-zA-Z0-9_]+)%");
     private static final Pattern UNRESOLVED_TAB = Pattern.compile("%[a-zA-Z0-9_:-]+%");
+    private static final DateTimeFormatter GENERATED_AT = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm z");
     static DiscordTabSnapshot capture(
             @Nonnull DiscordRoute route,
-            @Nonnull DiscordConfig.PlayerListImage config
+            @Nonnull DiscordConfig.PlayerListImage config,
+            @Nonnull String source
     ) {
         List<Player> routePlayers = route.type() == DiscordRoute.Type.GLOBAL
                 ? List.copyOf(ChatX.getProxy().getAllPlayers())
@@ -77,7 +83,7 @@ record DiscordTabSnapshot(
         String backend = route.type() == DiscordRoute.Type.GLOBAL ? "" : route.backend();
         String routeName = backend.isBlank() ? config.networkName() : Config.getServerDisplayName(backend);
         return new DiscordTabSnapshot(routeName, backend, config.networkName(), route.type() == DiscordRoute.Type.LOCAL, count,
-                ChatX.getProxy().getPlayerCount(), count - shown, config.maxPlayers(),
+                ChatX.getProxy().getPlayerCount(), count - shown, config.maxPlayers(), GENERATED_AT.format(ZonedDateTime.now()), source,
                 List.copyOf(entries.subList(0, shown)));
     }
 
@@ -96,6 +102,8 @@ record DiscordTabSnapshot(
         values.put("hidden", Integer.toString(hidden));
         values.put("shown", Integer.toString(players.size()));
         values.put("max", Integer.toString(maxPlayers));
+        values.put("generated_at", generatedAt);
+        values.put("source", source);
         for(var server : ChatX.getProxy().getAllServers()){
             String id = server.getServerInfo().getName();
             values.put("online_" + id, Integer.toString(server.getPlayersConnected().size()));

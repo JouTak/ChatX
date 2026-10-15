@@ -3,6 +3,8 @@ package cn.jason31416.chatx.discord;
 import cn.jason31416.chatx.ChatX;
 import com.velocitypowered.api.proxy.Player;
 import net.dv8tion.jda.api.entities.Message;
+import net.dv8tion.jda.api.entities.channel.concrete.ThreadChannel;
+import net.dv8tion.jda.api.entities.channel.middleman.GuildMessageChannel;
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
 
 import javax.annotation.Nonnull;
@@ -36,13 +38,22 @@ final class DiscordPlayerListCommand {
         }
 
         if("image".equals(command.image().mode())){
-            images.submit(route, event.getChannel().getId());
+            images.submit(route, event.getChannel().getId(), source(event));
         }else{
             List<String> players = players(route);
             String response = render(players, command.formats());
             manager.publishCommandResponse(event.getChannel().getId(), response, command.deleteAfterSeconds());
         }
         return true;
+    }
+
+    @Nonnull
+    private static String source(@Nonnull MessageReceivedEvent event) {
+        GuildMessageChannel channel = event.getChannel().asGuildMessageChannel();
+        if(channel instanceof ThreadChannel thread){
+            return "#" + thread.getParentChannel().getName() + " / " + thread.getName();
+        }
+        return "#" + channel.getName();
     }
 
     void shutdown() {

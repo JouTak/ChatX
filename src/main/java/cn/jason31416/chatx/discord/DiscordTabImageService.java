@@ -29,7 +29,7 @@ final class DiscordTabImageService {
                 }, new ThreadPoolExecutor.AbortPolicy());
     }
 
-    void submit(@Nonnull DiscordRoute route, @Nonnull String destinationId) {
+    void submit(@Nonnull DiscordRoute route, @Nonnull String destinationId, @Nonnull String source) {
         DiscordConfig.PlayerListCommand command = manager.getConfig().getPlayerListCommand();
         DiscordConfig.PlayerListImage config = command.image();
         AtomicBoolean responded = new AtomicBoolean();
@@ -40,9 +40,9 @@ final class DiscordTabImageService {
             job = renders.submit(() -> {
                 DiscordTabSnapshot snapshot = null;
                 try{
-                    snapshot = DiscordTabSnapshot.capture(route, config);
+                    snapshot = DiscordTabSnapshot.capture(route, config, source);
                     captured.set(snapshot);
-                    String response = fallback(snapshot, command, route);
+                    String response = fallback(snapshot, command, route, source);
                     if(renderer == null) renderer = new DiscordTabImageRenderer();
                     List<byte[]> images = renderer.render(snapshot, config, deadline);
                     if(System.currentTimeMillis() >= deadline) throw new IllegalStateException("TAB render timed out");
@@ -54,26 +54,26 @@ final class DiscordTabImageService {
                     }
                 }catch (Exception | LinkageError error){
                     if(responded.compareAndSet(false, true)){
-                        sendFallback(route, destinationId, command, snapshot);
+                        sendFallback(route, destinationId, source, command, snapshot);
                     }
                 }
             });
         }catch (RejectedExecutionException error){
-            sendFallback(route, destinationId, command, null);
+            sendFallback(route, destinationId, source, command, null);
             return;
         }
         try{
             ScheduledFuture<?> timeout = manager.getJda().getRateLimitPool().schedule(() -> {
                 if(responded.compareAndSet(false, true)){
                     job.cancel(true);
-                    sendFallback(route, destinationId, command, captured.get());
+                    sendFallback(route, destinationId, source, command, captured.get());
                 }
             }, config.renderTimeoutSeconds(), TimeUnit.SECONDS);
             if(job.isDone()) timeout.cancel(false);
         }catch (RejectedExecutionException error){
             job.cancel(true);
             if(responded.compareAndSet(false, true)){
-                sendFallback(route, destinationId, command, captured.get());
+                sendFallback(route, destinationId, source, command, captured.get());
             }
         }
     }
@@ -83,22 +83,22 @@ final class DiscordTabImageService {
         renders.getQueue().clear();
     }
 
-    private void sendFallback(DiscordRoute route, String destinationId,
+    private void sendFallback(DiscordRoute route, String destinationId, String source,
                               DiscordConfig.PlayerListCommand command, DiscordTabSnapshot snapshot) {
         ChatX.getProxy().getScheduler().buildTask(ChatX.getInstance(), () ->
-                manager.publishCommandResponse(destinationId, fallback(snapshot, command, route),
+                manager.publishCommandResponse(destinationId, fallback(snapshot, command, route, source),
                         command.deleteAfterSeconds())
         ).schedule();
     }
 
     private static String fallback(DiscordTabSnapshot snapshot, DiscordConfig.PlayerListCommand command,
-                                   DiscordRoute route) {
+                                   DiscordRoute route, String source) {
         String original = DiscordPlayerListCommand.render(
                 DiscordPlayerListCommand.players(route), command.formats());
         if(command.image().textFallback().isBlank()) return original;
         if(snapshot == null){
             try{
-                snapshot = DiscordTabSnapshot.capture(route, command.image());
+                snapshot = DiscordTabSnapshot.capture(route, command.image(), source);
             }catch (RuntimeException | LinkageError ignored){
                 return original;
             }

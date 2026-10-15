@@ -189,7 +189,7 @@ public class DiscordConfig {
                 imageTree.getString("header", "&b{network_name} &7• &f{network_online} в сети"),
                 imageTree.getString("footer", "&7{route_name}: показано {shown} из {count}"),
                 imageTree.getString("global-footer", "&7Показано {shown} из {count}"),
-                imageTree.getString("name-format", "{prefix}{display_name}{suffix}"),
+                imageTree.getString("name-format", "{prefix}{display_name} {suffix}"),
                 imageTree.getString("local-name-format", "{prefix}{display_name}"),
                 imageTree.getString("ping-format", "{ping} ms"),
                 imageTree.getString("text-fallback", ""),
