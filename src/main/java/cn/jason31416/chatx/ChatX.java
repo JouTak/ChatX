@@ -52,6 +52,7 @@ import java.util.concurrent.atomic.AtomicLong;
         },
         dependencies = {
                 @Dependency(id = "packetevents", optional = true),
+                @Dependency(id = "miniplaceholders", optional = true),
                 @Dependency(id = "papiproxybridge", optional = true),
                 @Dependency(id = "tab", optional = true),
                 @Dependency(id = "interactivechatvelocity", optional = true)
