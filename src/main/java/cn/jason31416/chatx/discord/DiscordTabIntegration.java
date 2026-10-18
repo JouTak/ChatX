@@ -6,6 +6,7 @@ import me.neznamy.tab.api.TabAPI;
 import me.neznamy.tab.api.TabPlayer;
 import me.neznamy.tab.api.tablist.SortingManager;
 import me.neznamy.tab.api.tablist.TabListFormatManager;
+import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
@@ -15,6 +16,13 @@ import java.util.UUID;
 
 /** Only loaded when the optional TAB plugin is present. */
 final class DiscordTabIntegration {
+    // Keep formatting-only placeholder output exactly as TAB does before legacy serialization.
+    private static final String DUMMY_CHAR = "\uFFFF";
+    private static final LegacyComponentSerializer LEGACY_SERIALIZER = LegacyComponentSerializer.builder()
+            .character('§')
+            .hexColors()
+            .build();
+
     private DiscordTabIntegration() {}
 
     @Nonnull
@@ -71,8 +79,9 @@ final class DiscordTabIntegration {
     }
 
     private static String resolved(Player player, TagResolver resolver, String placeholder) {
-        return LegacyComponentSerializer.legacySection().serialize(
-                MiniMessage.miniMessage().deserialize(placeholder, player, resolver));
+        Component component = MiniMessage.miniMessage().deserialize(placeholder + DUMMY_CHAR, player, resolver);
+        String value = LEGACY_SERIALIZER.serialize(component);
+        return value.endsWith(DUMMY_CHAR) ? value.substring(0, value.length() - DUMMY_CHAR.length()) : value;
     }
 
 }
