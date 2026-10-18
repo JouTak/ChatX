@@ -42,10 +42,10 @@ final class DiscordTabIntegration {
             suffix = applied(format.getCustomSuffix(tabPlayer), originalSuffix);
             try{
                 TagResolver resolver = MiniPlaceholders.audienceGlobalPlaceholders();
-                String resolvedPrefix = resolved(player, resolver, "<tab:tabprefix>");
-                String resolvedName = resolved(player, resolver, "<tab:customtabname>");
-                String resolvedSuffix = resolved(player, resolver, "<tab:tabsuffix>");
-                if(!resolvedName.isBlank() && !resolvedName.contains("<tab:")){
+                String resolvedPrefix = resolved(player, resolver, "<tab_tabprefix>");
+                String resolvedName = resolved(player, resolver, "<tab_customtabname>");
+                String resolvedSuffix = resolved(player, resolver, "<tab_tabsuffix>");
+                if(!resolvedName.isBlank() && !resolvedName.contains("<tab_")){
                     prefix = resolvedPrefix;
                     name = resolvedName;
                     suffix = resolvedSuffix;
