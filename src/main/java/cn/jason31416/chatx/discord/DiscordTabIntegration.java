@@ -1,16 +1,28 @@
 package cn.jason31416.chatx.discord;
 
 import com.velocitypowered.api.proxy.Player;
+import io.github.miniplaceholders.api.MiniPlaceholders;
 import me.neznamy.tab.api.TabAPI;
 import me.neznamy.tab.api.TabPlayer;
 import me.neznamy.tab.api.tablist.SortingManager;
 import me.neznamy.tab.api.tablist.TabListFormatManager;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.minimessage.MiniMessage;
+import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
+import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 
 import javax.annotation.Nonnull;
 import java.util.UUID;
 
 /** Only loaded when the optional TAB plugin is present. */
 final class DiscordTabIntegration {
+    // Preserve formatting-only output at the end of a TAB field during legacy serialization.
+    private static final String DUMMY_CHAR = "\uFFFF";
+    private static final LegacyComponentSerializer LEGACY_SERIALIZER = LegacyComponentSerializer.builder()
+            .character('§')
+            .hexColors()
+            .build();
+
     private DiscordTabIntegration() {}
 
     @Nonnull
@@ -36,6 +48,19 @@ final class DiscordTabIntegration {
             prefix = applied(format.getCustomPrefix(tabPlayer), originalPrefix);
             name = applied(format.getCustomName(tabPlayer), originalName);
             suffix = applied(format.getCustomSuffix(tabPlayer), originalSuffix);
+            try{
+                TagResolver resolver = MiniPlaceholders.audienceGlobalPlaceholders();
+                String resolvedPrefix = resolved(player, resolver, "<tab:tabprefix>");
+                String resolvedName = resolved(player, resolver, "<tab:customtabname>");
+                String resolvedSuffix = resolved(player, resolver, "<tab:tabsuffix>");
+                if(!resolvedName.isBlank() && !resolvedName.contains("<tab:")){
+                    prefix = resolvedPrefix;
+                    name = resolvedName;
+                    suffix = resolvedSuffix;
+                }
+            }catch (RuntimeException | LinkageError ignored){
+                // MiniPlaceholders is optional. Keep the TAB API values as fallback.
+            }
         }
         String sortKey = "";
         if(sorting != null){
@@ -51,6 +76,12 @@ final class DiscordTabIntegration {
 
     private static String value(String value) {
         return value == null ? "" : value;
+    }
+
+    private static String resolved(Player player, TagResolver resolver, String placeholder) {
+        Component component = MiniMessage.miniMessage().deserialize(placeholder + DUMMY_CHAR, player, resolver);
+        String value = LEGACY_SERIALIZER.serialize(component);
+        return value.endsWith(DUMMY_CHAR) ? value.substring(0, value.length() - DUMMY_CHAR.length()) : value;
     }
 
 }

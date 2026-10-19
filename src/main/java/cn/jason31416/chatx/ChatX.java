@@ -46,12 +46,13 @@ import java.util.concurrent.atomic.AtomicLong;
 @Plugin(
         id = "chatx",
         name = "ChatXJT",
-        version = "1.4.0",
+        version = "1.4.6",
         authors = {
                 "EnderDissa"
         },
         dependencies = {
                 @Dependency(id = "packetevents", optional = true),
+                @Dependency(id = "miniplaceholders", optional = true),
                 @Dependency(id = "papiproxybridge", optional = true),
                 @Dependency(id = "tab", optional = true),
                 @Dependency(id = "interactivechatvelocity", optional = true)
