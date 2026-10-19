@@ -13,6 +13,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -32,6 +36,7 @@ record DiscordTabSnapshot(
     private static final Pattern PLACEHOLDER = Pattern.compile("\\{([a-zA-Z0-9_]+)}|%([a-zA-Z0-9_]+)%");
     private static final Pattern UNRESOLVED_TAB = Pattern.compile("%[a-zA-Z0-9_:-]+%");
     private static final DateTimeFormatter GENERATED_AT = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm z");
+    private static final long TAB_PLACEHOLDER_TIMEOUT_MILLIS = 1_200;
     static DiscordTabSnapshot capture(
             @Nonnull DiscordRoute route,
             @Nonnull DiscordConfig.PlayerListImage config,
@@ -44,19 +49,34 @@ record DiscordTabSnapshot(
                         .orElseGet(List::of);
         boolean tabAvailable = config.useTab()
                 && ChatX.getProxy().getPluginManager().isLoaded("tab");
-        List<Entry> entries = new ArrayList<>(routePlayers.size());
+        List<CompletableFuture<DiscordTabValues>> tabValues = new ArrayList<>(routePlayers.size());
         for(Player player : routePlayers){
+            if(!tabAvailable){
+                tabValues.add(CompletableFuture.completedFuture(DiscordTabValues.EMPTY));
+                continue;
+            }
+            try{
+                tabValues.add(DiscordTabIntegration.values(player));
+            }catch (RuntimeException | LinkageError ignored){
+                tabValues.add(CompletableFuture.completedFuture(DiscordTabValues.EMPTY));
+            }
+        }
+        try{
+            // The bridge request is bounded by its own timeout and all players resolve in parallel.
+            CompletableFuture.allOf(tabValues.toArray(CompletableFuture[]::new))
+                    .get(TAB_PLACEHOLDER_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS);
+        }catch (InterruptedException error){
+            Thread.currentThread().interrupt();
+        }catch (ExecutionException | TimeoutException ignored){
+            // Keep values already available from TAB if the backend bridge is slow.
+        }
+        List<Entry> entries = new ArrayList<>(routePlayers.size());
+        for(int index = 0; index < routePlayers.size(); index++){
+            Player player = routePlayers.get(index);
             String backend = player.getCurrentServer()
                     .map(connection -> connection.getServer().getServerInfo().getName())
                     .orElse("");
-            DiscordTabValues tab = DiscordTabValues.EMPTY;
-            if(tabAvailable){
-                try{
-                    tab = DiscordTabIntegration.values(player);
-                }catch (RuntimeException | LinkageError ignored){
-                    // TAB is optional and may be reloading while the snapshot is taken.
-                }
-            }
+            DiscordTabValues tab = tabValues.get(index).getNow(DiscordTabValues.EMPTY);
             entries.add(new Entry(
                     player.getUniqueId(), player.getUsername(), backend,
                     Config.getServerDisplayName(backend),
